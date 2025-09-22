@@ -1,0 +1,4 @@
+functions-framework
+opencv-python-headless
+numpy
+google-cloud-storage
