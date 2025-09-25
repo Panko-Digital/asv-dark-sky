@@ -1,0 +1,23 @@
+{
+  "name": "asv-dark-sky",
+  "slug": "asv-dark-sky",
+  "expo": {
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
+          "recordAudioAndroid": false,
+          "saveToCameraRoll": false,
+          "locationPermission": "Allow $(PRODUCT_NAME) to access your location"
+        }
+      ]
+    ]
+  },
+  "extra": {
+    "eas": {
+      "projectId": "09e19a64-809a-4289-b691-fd5c9d771acb"
+    }
+  },
+  "owner": "stesmi99"
+}
