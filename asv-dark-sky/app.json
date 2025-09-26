@@ -9,10 +9,31 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
           "recordAudioAndroid": false,
           "saveToCameraRoll": false,
-          "locationPermission": "Allow $(PRODUCT_NAME) to access your location"
+          "locationPermission": "Allow $(PRODUCT_NAME) to access your location",
+          "imagePickerPermission": "Allow $(PRODUCT_NAME) to access your photos"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "09e19a64-809a-4289-b691-fd5c9d771acb"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.stesmi99.asvdarksky",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/09e19a64-809a-4289-b691-fd5c9d771acb"
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
+    }
   },
   "extra": {
     "eas": {

@@ -5,7 +5,7 @@ import {
   useCameraPermissions,
 } from "expo-camera";
 import { useRef, useState } from "react";
-import { Button, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Button, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 // import AntDesign from "@expo/vector-icons/AntDesign";
 // import Feather from "@expo/vector-icons/Feather";
@@ -48,9 +48,34 @@ export default function App() {
   }
 
   const takePicture = async () => {
-    const photo = await ref.current?.takePictureAsync();
-    if (photo?.uri) setUris((prev) => [...prev, photo.uri]);
-    setViewMode("review");
+    try {
+      const photo = await ref.current?.takePictureAsync();
+      console.log("Photo taken:", photo);
+      console.log("Platform:", Platform.OS);
+
+      if (photo?.uri) {
+        console.log("Photo URI:", photo.uri);
+        console.log("URI accessible:", await checkUriAccessible(photo.uri));
+        setUris((prev) => [...prev, photo.uri]);
+        setViewMode("review");
+      } else {
+        console.log("No photo URI received");
+        Alert.alert("Error", "Failed to capture photo - no URI received");
+      }
+    } catch (error) {
+      console.error("Error taking picture:", error);
+      Alert.alert("Camera Error", `Failed to take picture: ${error}`);
+    }
+  };
+
+  const checkUriAccessible = async (uri: string): Promise<boolean> => {
+    try {
+      const response = await fetch(uri);
+      return response.ok;
+    } catch (error) {
+      console.error("URI not accessible:", error);
+      return false;
+    }
   };
 
   const toBase64 = async (uri: string) => {
@@ -106,24 +131,28 @@ export default function App() {
 
   const renderPictures = (uris: string[]) => {
     return (
-      <View>
+      <View style={styles.reviewContainer}>
         {uris.map((uri, idx) => (
-          <div key={uri}>
+          <View key={uri} style={styles.imageContainer}>
             <Image
-              key={uri}
               source={{ uri }}
               contentFit="cover"
-              style={{
-                width: 200,
-                height: 200,
-                borderRadius: "50%",
-                aspectRatio: 1,
+              style={styles.previewImage}
+              onError={(error) => {
+                console.error(`Image load error for ${uri}:`, error);
+                Alert.alert("Image Error", `Failed to load image: ${uri}`);
+              }}
+              onLoad={() => {
+                console.log(`Image loaded successfully: ${uri}`);
               }}
             />
-            <p style={{ textAlign: "center" }}>
-              {idx === 0 ? "Light" : "Dark"}
-            </p>
-          </div>
+            <Text style={styles.imageLabel}>
+              {idx === 0 ? "Light" : "Dark"} Frame
+            </Text>
+            <Text style={styles.debugText}>
+              Platform: {Platform.OS} | URI: {uri.substring(uri.lastIndexOf('/') + 1)}
+            </Text>
+          </View>
         ))}
         {uris.length < 2 && (
           <Button
@@ -245,5 +274,33 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 50,
+  },
+  reviewContainer: {
+    flex: 1,
+    padding: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imageContainer: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  previewImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    aspectRatio: 1,
+  },
+  imageLabel: {
+    textAlign: "center",
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  debugText: {
+    textAlign: "center",
+    marginTop: 5,
+    fontSize: 12,
+    color: "#666",
   },
 });
