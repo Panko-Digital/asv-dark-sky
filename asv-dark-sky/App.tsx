@@ -5,7 +5,16 @@ import {
   useCameraPermissions,
 } from "expo-camera";
 import { useRef, useState } from "react";
-import { Alert, Button, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Button,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Image } from "expo-image";
 // import AntDesign from "@expo/vector-icons/AntDesign";
 // import Feather from "@expo/vector-icons/Feather";
@@ -18,19 +27,26 @@ export type responseFormat = {
   sky_quality_meter: number;
 };
 
+export type errorResponseFormat = {
+  error: string;
+};
+
 const SERVER_URL =
   "https://australia-southeast2-popkorn-472305.cloudfunctions.net/calculate_sky_brightness";
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const ref = useRef<CameraView>(null);
-  const [uris, setUris] = useState<string[]>([]);
+  // const [uris, setUris] = useState<string[]>([]);
+  const [darkFrame, setDarkFrame] = useState<string | null>(null);
+  const [lightFrame, setLightFrame] = useState<string | null>(null);
+
   const [mode, setMode] = useState<CameraMode>("picture");
-  const [viewMode, setViewMode] = useState<ViewMode>("camera");
+  const [viewMode, setViewMode] = useState<ViewMode>("review");
   const [SQM, setSQM] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // const [facing, setFacing] = useState<CameraType>("back");
-  // const [recording, setRecording] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [exposureTime, setExposureTime] = useState<number>(3000); // in milliseconds
 
   if (!permission) {
     return null;
@@ -47,16 +63,37 @@ export default function App() {
     );
   }
 
+  const reset = (label: string) => {
+    // setUris([]);
+    if (label === "Light Frame") {
+      setLightFrame(null);
+    } else if (label === "Dark Frame") {
+      setDarkFrame(null);
+    }
+    // setSQM(null);
+    // setError(null);
+    setViewMode("review");
+  };
+
   const takePicture = async () => {
     try {
-      const photo = await ref.current?.takePictureAsync();
+      const photo = await ref.current?.takePictureAsync({
+        quality: 0.8,
+        base64: true,
+        exif: false,
+      });
       console.log("Photo taken:", photo);
       console.log("Platform:", Platform.OS);
 
       if (photo?.uri) {
         console.log("Photo URI:", photo.uri);
         console.log("URI accessible:", await checkUriAccessible(photo.uri));
-        setUris((prev) => [...prev, photo.uri]);
+        if (!lightFrame) {
+          setLightFrame(photo.uri);
+        } else {
+          setDarkFrame(photo.uri);
+        }
+        // setUris((prev) => [...prev, photo.uri]);
         setViewMode("review");
       } else {
         console.log("No photo URI received");
@@ -78,32 +115,24 @@ export default function App() {
     }
   };
 
-  const toBase64 = async (uri: string) => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  };
-
   const sendToServer = async () => {
     // send uris to server
-    let lightFrame = uris[0];
-    let darkFrame = uris[1];
+    // let lightFrame = uris[0];
+    // let darkFrame = uris[1];
     if (lightFrame && darkFrame) {
+      setLoading(true);
+      setError(null);
+      setSQM(null);
       const response = await fetch(SERVER_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          light: lightFrame,
-          dark: darkFrame,
+          light_image: lightFrame,
+          dark_image: darkFrame,
           zero_point: 20.0,
-          exposure_time_s: 3,
+          exposure_time_s: exposureTime / 1000,
           metadata: {
             location: "optional_location_info",
             timestamp: "optional_timestamp",
@@ -111,72 +140,146 @@ export default function App() {
         }),
       });
 
-      const responseFormat = {
-        median_sky_brightness_dn: 12.0,
-        sky_quality_meter: 18.494850021680094,
-      };
+      setLoading(false);
 
       if (!response.ok) {
-        console.error("Failed to send images to server");
+        // console.error("Failed to send images to server");
         setSQM(null);
-        setError(
-          "Failed to get sky quality meter reading, could not send images to server"
-        );
+        const errorPayload: errorResponseFormat = await response.json();
+        setError(errorPayload.error);
       } else {
         const data: responseFormat = await response.json();
+
         setSQM(data.sky_quality_meter);
       }
     }
   };
 
-  const renderPictures = (uris: string[]) => {
+  const renderPictures = () => {
     return (
       <View style={styles.reviewContainer}>
-        {uris.map((uri, idx) => (
-          <View key={uri} style={styles.imageContainer}>
-            <Image
-              source={{ uri }}
-              contentFit="cover"
-              style={styles.previewImage}
-              onError={(error) => {
-                console.error(`Image load error for ${uri}:`, error);
-                Alert.alert("Image Error", `Failed to load image: ${uri}`);
-              }}
-              onLoad={() => {
-                console.log(`Image loaded successfully: ${uri}`);
-              }}
-            />
-            <Text style={styles.imageLabel}>
-              {idx === 0 ? "Light" : "Dark"} Frame
-            </Text>
-            <Text style={styles.debugText}>
-              Platform: {Platform.OS} | URI: {uri.substring(uri.lastIndexOf('/') + 1)}
-            </Text>
-          </View>
-        ))}
-        {uris.length < 2 && (
-          <Button
+        {[
+          { uri: lightFrame, label: "Light Frame" },
+          { uri: darkFrame, label: "Dark Frame" },
+        ]
+          .filter((f) => f.uri)
+          .map((f) => (
+            <View key={f.uri!} style={styles.imageContainer}>
+              <Image
+                source={{ uri: f.uri! }}
+                contentFit="cover"
+                style={styles.previewImage}
+                onError={() => {
+                  Alert.alert("Image Error", `Failed to load image: ${f.uri}`);
+                }}
+                onLoad={() => {
+                  console.log(`Image loaded successfully: ${f.uri}`);
+                }}
+              />
+              <Text style={styles.imageLabel}>{f.label}</Text>
+              <Pressable
+                onPress={() => {
+                  reset(f.label);
+                }}
+                style={{ marginTop: 10 }}
+              >
+                <Text
+                  style={{
+                    color: "#ff0000",
+                    textDecorationLine: "underline",
+                  }}
+                >
+                  Clear
+                </Text>
+              </Pressable>
+              {/* <Text style={styles.debugText}>{f.uri}</Text> */}
+            </View>
+          ))}
+
+        {(!lightFrame || !darkFrame) && (
+          <Pressable
             onPress={() => {
               setMode("picture");
               setViewMode("camera");
             }}
-            title={`${uris.length === 1 ? "Shield the lenses and " : ""}Take ${
-              uris.length > 0 ? "dark" : "light"
-            } frame`}
-          />
+            style={({ pressed }) => [
+              {
+                backgroundColor: "#000000",
+                borderWidth: 2,
+                borderRadius: 8,
+                borderColor: "#ff0000",
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                alignItems: "center",
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Text
+              style={{
+                color: "#ff0000",
+                fontSize: 16,
+                fontWeight: "bold",
+              }}
+            >
+              {`${
+                lightFrame !== null
+                  ? "Shield the lenses and take a dark frame"
+                  : "Take sky photo"
+              }`}
+            </Text>
+          </Pressable>
         )}
-        {uris.length === 2 && (
-          <Button
+
+        {!loading && lightFrame && darkFrame && (
+          <Pressable
             onPress={() => {
               sendToServer();
             }}
-            title={`Check my sky quality`}
-          />
+            style={({ pressed }) => [
+              {
+                backgroundColor: "#000000",
+                borderWidth: 2,
+                borderRadius: 8,
+                borderColor: "#ff0000",
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                alignItems: "center",
+              },
+              pressed && { opacity: 0.6 },
+            ]}
+          >
+            <Text
+              style={{ color: "#ff0000", fontSize: 16, fontWeight: "bold" }}
+            >
+              Check my sky quality
+            </Text>
+          </Pressable>
         )}
-        {SQM && (
-          <Text style={{ textAlign: "center", marginTop: 20, fontSize: 18 }}>
-            Your sky quality meter reading is {SQM.toFixed(2)}
-          </Text>
+
+        {loading ? (
+          <View
+            style={{
+              marginTop: 20,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <ActivityIndicator size="large" color="red" />
+          </View>
+        ) : (
+          SQM && (
+            <Text
+              style={{
+                textAlign: "center",
+                marginTop: 20,
+                fontSize: 18,
+                color: "#ff0000ff",
+              }}
+            >
+              Your sky quality meter reading is {SQM.toFixed(2)}
+            </Text>
+          )
         )}
         {error && (
           <Text
@@ -184,7 +287,7 @@ export default function App() {
               textAlign: "center",
               marginTop: 20,
               fontSize: 18,
-              color: "red",
+              color: "#ff0000ff",
             }}
           >
             {error}
@@ -204,7 +307,36 @@ export default function App() {
           mute={true}
           responsiveOrientationWhenOrientationLocked
           flash="off"
+          pictureSize="800x600"
+          // exposure={exposureTime} // in microseconds
+          enableTorch={false}
         />
+        {/* Exposure controls */}
+        {/* {!lightFrame && !darkFrame && (
+          <View style={styles.exposureControls}>
+            <Text style={styles.exposureLabel}>
+              Exposure: {(exposureTime / 1000).toFixed(1)}s
+            </Text>
+            <View style={styles.exposureButtons}>
+              <Pressable
+                onPress={() =>
+                  setExposureTime(Math.max(100, exposureTime - 500))
+                }
+                style={styles.exposureButton}
+              >
+                <Text style={styles.exposureButtonText}>-</Text>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  setExposureTime(Math.min(10000, exposureTime + 500))
+                }
+                style={styles.exposureButton}
+              >
+                <Text style={styles.exposureButtonText}>+</Text>
+              </Pressable>
+            </View>
+          </View>
+        )} */}
         <View style={styles.shutterContainer}>
           <Pressable onPress={takePicture}>
             {({ pressed }) => (
@@ -234,9 +366,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      {viewMode === "review" && uris.length > 0
-        ? renderPictures(uris)
-        : renderCamera()}
+      {viewMode === "review" ? renderPictures() : renderCamera()}
     </View>
   );
 }
@@ -244,9 +374,10 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#000000ff",
     alignItems: "center",
     justifyContent: "center",
+    color: "#ff0000ff",
   },
   cameraContainer: StyleSheet.absoluteFillObject,
   camera: StyleSheet.absoluteFillObject,
@@ -296,11 +427,45 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     fontWeight: "bold",
+    color: "#ff0000ff",
   },
   debugText: {
     textAlign: "center",
     marginTop: 5,
     fontSize: 12,
-    color: "#666",
+    color: "#ff0000ff",
+  },
+  exposureControls: {
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  exposureLabel: {
+    color: "#ff0000ff",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  exposureButtons: {
+    flexDirection: "row",
+    gap: 20,
+  },
+  exposureButton: {
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderWidth: 2,
+    borderColor: "#ff0000",
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  exposureButtonText: {
+    color: "#ff0000",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });
