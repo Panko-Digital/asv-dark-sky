@@ -250,28 +250,35 @@ export default function App() {
             </View>
           ))}
 
-        <Pressable
-          onPress={() => {
-            sendToServer();
-          }}
-          style={({ pressed }) => [
-            {
-              backgroundColor: "#000000",
-              borderWidth: 2,
-              borderRadius: 8,
-              borderColor: "#ff0000",
-              paddingVertical: 12,
-              paddingHorizontal: 20,
-              alignItems: "center",
-            },
-            pressed && { opacity: 0.6 },
-            !(lightFrame && darkFrame) && { opacity: 0, pointerEvents: "none" },
-          ]}
-        >
-          <Text style={{ color: "#ff0000", fontSize: 16, fontWeight: "bold" }}>
-            Check Sky Quality
-          </Text>
-        </Pressable>
+        {!loading && (
+          <Pressable
+            onPress={() => {
+              sendToServer();
+            }}
+            style={({ pressed }) => [
+              {
+                backgroundColor: "#000000",
+                borderWidth: 2,
+                borderRadius: 8,
+                borderColor: "#ff0000",
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                alignItems: "center",
+              },
+              pressed && { opacity: 0.6 },
+              !(lightFrame && darkFrame) && {
+                opacity: 0,
+                pointerEvents: "none",
+              },
+            ]}
+          >
+            <Text
+              style={{ color: "#ff0000", fontSize: 16, fontWeight: "bold" }}
+            >
+              Check Sky Quality
+            </Text>
+          </Pressable>
+        )}
 
         {loading ? (
           <View
