@@ -190,7 +190,7 @@ export default function App() {
                   <Image
                     source={{ uri: f.uri! }}
                     contentFit="cover"
-                    style={[styles.previewImage, styles.dashedBorder]}
+                    style={styles.previewImage}
                     onError={() => {
                       Alert.alert(
                         "Image Error",
@@ -445,6 +445,9 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     aspectRatio: 1,
     marginTop: 10,
+    borderStyle: "dashed",
+    borderWidth: 2,
+    borderColor: "#ff0000",
   },
   emptyImage: {
     width: 200,
