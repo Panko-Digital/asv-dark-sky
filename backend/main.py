@@ -80,7 +80,7 @@ def calculate_sky_brightness(request):
                 return img #, blob.public_url
                 
             except Exception as e:
-                raise ValueError(f"Error processing image {description}: {str(e)}")
+                raise ValueError(f"Error processing {description} image: {str(e)}")
 
         # Upload both images and get the decoded image data
         light_frame = decode_image_from_base64(light_image_b64, "light")
@@ -111,7 +111,6 @@ def calculate_sky_brightness(request):
         sky_quality_meter = instrumental_magnitude + zero_point
         
         # Prepare response with upload info and calculation results
-         # Return the results
         return json.dumps({
             "median_sky_brightness_dn": float(median_value),
             "sky_quality_meter": float(sky_quality_meter)

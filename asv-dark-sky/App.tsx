@@ -16,8 +16,7 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
-// import AntDesign from "@expo/vector-icons/AntDesign";
-// import Feather from "@expo/vector-icons/Feather";
+import AntDesign from "@expo/vector-icons/AntDesign";
 // import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 
 export type ViewMode = "camera" | "review";
@@ -42,6 +41,7 @@ export default function App() {
   const [lightFrame, setLightFrame] = useState<string | null>(null);
 
   const [mode, setMode] = useState<CameraMode>("picture");
+  const [frame, setFrame] = useState<"light" | "dark">("light");
   const [viewMode, setViewMode] = useState<ViewMode>("review");
   const [SQM, setSQM] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,10 +55,26 @@ export default function App() {
   if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={{ textAlign: "center" }}>
-          We need your permission to use the camera
+        <Text style={{ textAlign: "center", color: "#ff0000ff" }}>
+          This app needs your permission to use the camera
         </Text>
-        <Button onPress={requestPermission} title="Grant permission" />
+        <Pressable
+          onPress={requestPermission}
+          style={({ pressed }) => [
+            {
+              backgroundColor: "#000000",
+              borderWidth: 2,
+              borderRadius: 8,
+              borderColor: "#ff0000",
+              paddingVertical: 12,
+              paddingHorizontal: 20,
+              alignItems: "center",
+            },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Text>Grant permission</Text>
+        </Pressable>
       </View>
     );
   }
@@ -88,7 +104,7 @@ export default function App() {
       if (photo?.uri) {
         console.log("Photo URI:", photo.uri);
         console.log("URI accessible:", await checkUriAccessible(photo.uri));
-        if (!lightFrame) {
+        if (frame === "light") {
           setLightFrame(photo.uri);
         } else {
           setDarkFrame(photo.uri);
@@ -166,6 +182,9 @@ export default function App() {
           .map((f) => (
             <View key={f.uri!} style={styles.imageContainer}>
               <Text style={styles.imageLabel}>{f.label}</Text>
+              {f.label !== "Sky Photo" && (
+                <Text style={styles.shieldLabel}>(Shield camera lenses)</Text>
+              )}
               {f.uri ? (
                 <View>
                   <Image
@@ -186,7 +205,11 @@ export default function App() {
                     onPress={() => {
                       reset(f.label);
                     }}
-                    style={{ marginTop: 10 }}
+                    style={{
+                      marginTop: 10,
+                      paddingVertical: 0,
+                      paddingHorizontal: 20,
+                    }}
                   >
                     <Text
                       style={{
@@ -201,78 +224,54 @@ export default function App() {
                 </View>
               ) : (
                 <View>
-                  <View style={[styles.emptyImage, styles.dashedBorder]}>
-                    <Text style={{ color: "#ff0000" }}>Empty</Text>
-                  </View>
+                  <Pressable
+                    onPress={() => {
+                      setMode("picture");
+                      setFrame(f.label === "Sky Photo" ? "light" : "dark");
+                      setViewMode("camera");
+                    }}
+                    style={[styles.emptyImage, styles.dashedBorder]}
+                  >
+                    <Text
+                      style={{
+                        color: "#ff0000",
+                        fontSize: 20,
+                        textAlign: "center",
+                      }}
+                    >
+                      <AntDesign name="camera" size={24} color="red" />
+                    </Text>
+                  </Pressable>
                   <View style={{ marginTop: 10 }}>
                     <Text>" "</Text>
                   </View>
                 </View>
               )}
-              {/* <Text style={styles.debugText}>{f.uri}</Text> */}
             </View>
           ))}
 
-        {(!lightFrame || !darkFrame) && (
-          <Pressable
-            onPress={() => {
-              setMode("picture");
-              setViewMode("camera");
-            }}
-            style={({ pressed }) => [
-              {
-                backgroundColor: "#000000",
-                borderWidth: 2,
-                borderRadius: 8,
-                borderColor: "#ff0000",
-                paddingVertical: 20,
-                paddingHorizontal: 40,
-                alignItems: "center",
-              },
-              pressed && { opacity: 0.6 },
-            ]}
-          >
-            <Text
-              style={{
-                color: "#ff0000",
-                fontSize: 20,
-                fontWeight: "bold",
-              }}
-            >
-              {`${
-                lightFrame !== null
-                  ? "Shield the lenses and take Dark Photo"
-                  : "Take Sky Photo"
-              }`}
-            </Text>
-          </Pressable>
-        )}
-
-        {!loading && lightFrame && darkFrame && (
-          <Pressable
-            onPress={() => {
-              sendToServer();
-            }}
-            style={({ pressed }) => [
-              {
-                backgroundColor: "#000000",
-                borderWidth: 2,
-                borderRadius: 8,
-                borderColor: "#ff0000",
-                paddingVertical: 12,
-                paddingHorizontal: 20,
-                alignItems: "center",
-              },
-              pressed && { opacity: 0.6 },
-            ]}
-          >
-            <Text
-              style={{ color: "#ff0000", fontSize: 16, fontWeight: "bold" }}
-            >
-              Check my sky quality
-            </Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={() => {
+            sendToServer();
+          }}
+          style={({ pressed }) => [
+            {
+              backgroundColor: "#000000",
+              borderWidth: 2,
+              borderRadius: 8,
+              borderColor: "#ff0000",
+              paddingVertical: 12,
+              paddingHorizontal: 20,
+              alignItems: "center",
+            },
+            pressed && { opacity: 0.6 },
+            !(lightFrame && darkFrame) && { opacity: 0, pointerEvents: "none" },
+          ]}
+        >
+          <Text style={{ color: "#ff0000", fontSize: 16, fontWeight: "bold" }}>
+            Check Sky Quality
+          </Text>
+        </Pressable>
 
         {loading ? (
           <View
@@ -294,7 +293,7 @@ export default function App() {
                 color: "#ff0000ff",
               }}
             >
-              Your sky quality meter reading is {SQM.toFixed(2)}
+              Sky Quality Measure is {SQM.toFixed(2)}
             </Text>
           )
         )}
@@ -438,6 +437,7 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 100,
     aspectRatio: 1,
+    marginTop: 10,
   },
   emptyImage: {
     width: 200,
@@ -445,6 +445,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 10,
   },
   dashedBorder: {
     borderStyle: "dashed",
@@ -455,9 +456,13 @@ const styles = StyleSheet.create({
   imageLabel: {
     textAlign: "center",
     marginTop: 0,
-    marginBottom: 10,
     fontSize: 16,
     fontWeight: "bold",
+    color: "#ff0000ff",
+  },
+  shieldLabel: {
+    textAlign: "center",
+    fontSize: 16,
     color: "#ff0000ff",
   },
   debugText: {
