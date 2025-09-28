@@ -65,9 +65,9 @@ export default function App() {
 
   const reset = (label: string) => {
     // setUris([]);
-    if (label === "Light Frame") {
+    if (label === "Sky Photo") {
       setLightFrame(null);
-    } else if (label === "Dark Frame") {
+    } else {
       setDarkFrame(null);
     }
     // setSQM(null);
@@ -159,39 +159,56 @@ export default function App() {
     return (
       <View style={styles.reviewContainer}>
         {[
-          { uri: lightFrame, label: "Light Frame" },
-          { uri: darkFrame, label: "Dark Frame" },
+          { uri: lightFrame, label: "Sky Photo" },
+          { uri: darkFrame, label: "Dark Photo" },
         ]
-          .filter((f) => f.uri)
+          // .filter((f) => f.uri)
           .map((f) => (
             <View key={f.uri!} style={styles.imageContainer}>
-              <Image
-                source={{ uri: f.uri! }}
-                contentFit="cover"
-                style={styles.previewImage}
-                onError={() => {
-                  Alert.alert("Image Error", `Failed to load image: ${f.uri}`);
-                }}
-                onLoad={() => {
-                  console.log(`Image loaded successfully: ${f.uri}`);
-                }}
-              />
               <Text style={styles.imageLabel}>{f.label}</Text>
-              <Pressable
-                onPress={() => {
-                  reset(f.label);
-                }}
-                style={{ marginTop: 10 }}
-              >
-                <Text
-                  style={{
-                    color: "#ff0000",
-                    textDecorationLine: "underline",
-                  }}
-                >
-                  Clear
-                </Text>
-              </Pressable>
+              {f.uri ? (
+                <View>
+                  <Image
+                    source={{ uri: f.uri! }}
+                    contentFit="cover"
+                    style={[styles.previewImage, styles.dashedBorder]}
+                    onError={() => {
+                      Alert.alert(
+                        "Image Error",
+                        `Failed to load image: ${f.uri}`
+                      );
+                    }}
+                    onLoad={() => {
+                      console.log(`Image loaded successfully: ${f.uri}`);
+                    }}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      reset(f.label);
+                    }}
+                    style={{ marginTop: 10 }}
+                  >
+                    <Text
+                      style={{
+                        color: "#ff0000",
+                        textDecorationLine: "underline",
+                        textAlign: "center",
+                      }}
+                    >
+                      Clear
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View>
+                  <View style={[styles.emptyImage, styles.dashedBorder]}>
+                    <Text style={{ color: "#ff0000" }}>Empty</Text>
+                  </View>
+                  <View style={{ marginTop: 10 }}>
+                    <Text>" "</Text>
+                  </View>
+                </View>
+              )}
               {/* <Text style={styles.debugText}>{f.uri}</Text> */}
             </View>
           ))}
@@ -208,8 +225,8 @@ export default function App() {
                 borderWidth: 2,
                 borderRadius: 8,
                 borderColor: "#ff0000",
-                paddingVertical: 12,
-                paddingHorizontal: 20,
+                paddingVertical: 20,
+                paddingHorizontal: 40,
                 alignItems: "center",
               },
               pressed && { opacity: 0.6 },
@@ -218,14 +235,14 @@ export default function App() {
             <Text
               style={{
                 color: "#ff0000",
-                fontSize: 16,
+                fontSize: 20,
                 fontWeight: "bold",
               }}
             >
               {`${
                 lightFrame !== null
-                  ? "Shield the lenses and take a dark frame"
-                  : "Take sky photo"
+                  ? "Shield the lenses and take Dark Photo"
+                  : "Take Sky Photo"
               }`}
             </Text>
           </Pressable>
@@ -307,7 +324,7 @@ export default function App() {
           mute={true}
           responsiveOrientationWhenOrientationLocked
           flash="off"
-          pictureSize="800x600"
+          // pictureSize="800x600"
           // exposure={exposureTime} // in microseconds
           enableTorch={false}
         />
@@ -422,9 +439,23 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     aspectRatio: 1,
   },
+  emptyImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dashedBorder: {
+    borderStyle: "dashed",
+    borderWidth: 2,
+    borderColor: "#ff0000",
+    backgroundColor: "#000000",
+  },
   imageLabel: {
     textAlign: "center",
-    marginTop: 10,
+    marginTop: 0,
+    marginBottom: 10,
     fontSize: 16,
     fontWeight: "bold",
     color: "#ff0000ff",
