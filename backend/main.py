@@ -46,16 +46,16 @@ def calculate_sky_brightness(request):
             return json.dumps({"error": "Both light_image and dark_image are required as base64 encoded data"}), 400
 
         # Initialize Google Cloud Storage client
-        # bucket_name = "asvgeelong-sqm"
-        # storage_client = storage.Client()
-        # bucket = storage_client.bucket(bucket_name)
+        bucket_name = "asvgeelong-sqm"
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
 
         # Generate unique filenames with timestamp
-        # timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        # session_id = str(uuid.uuid4())[:8]
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        session_id = str(uuid.uuid4())[:8]
         
-        # light_filename = f"uploads/{timestamp}_{session_id}_light.jpg"
-        # dark_filename = f"uploads/{timestamp}_{session_id}_dark.jpg"
+        light_filename = f"uploads/{timestamp}_{session_id}_light.jpg"
+        dark_filename = f"uploads/{timestamp}_{session_id}_dark.jpg"
 
         # Helper function to decode, validate and upload image
         def decode_image_from_base64(base64_data, description):
@@ -74,17 +74,17 @@ def calculate_sky_brightness(request):
                     raise ValueError(f"Could not decode image data for {description}")
                 
                 # Upload to GCS
-                # blob = bucket.blob(description)
-                # blob.upload_from_string(image_bytes, content_type='image/jpeg')
+                blob = bucket.blob(description)
+                blob.upload_from_string(image_bytes, content_type='image/jpeg')
                 
-                return img #, blob.public_url
+                return img, blob.public_url
                 
             except Exception as e:
-                raise ValueError(f"Error processing {description} image: {str(e)}")
+                raise ValueError(f"Error processing image {description}: {str(e)}")
 
         # Upload both images and get the decoded image data
-        light_frame = decode_image_from_base64(light_image_b64, "light")
-        dark_frame = decode_image_from_base64(dark_image_b64, "dark")
+        light_frame, light_url = decode_image_from_base64(light_image_b64, light_filename)
+        dark_frame, dark_url = decode_image_from_base64(dark_image_b64, dark_filename)
 
         # Ensure images are the same size
         if light_frame.shape != dark_frame.shape:
@@ -111,12 +111,31 @@ def calculate_sky_brightness(request):
         sky_quality_meter = instrumental_magnitude + zero_point
         
         # Prepare response with upload info and calculation results
-        return json.dumps({
+        response = {
             "median_sky_brightness_dn": float(median_value),
-            "sky_quality_meter": float(sky_quality_meter)
-        }), 200
+            "sky_quality_meter": float(sky_quality_meter),
+            "instrumental_magnitude": float(instrumental_magnitude),
+            "uploaded_files": {
+                "light_frame": {
+                    "filename": light_filename,
+                    "url": light_url
+                },
+                "dark_frame": {
+                    "filename": dark_filename,
+                    "url": dark_url
+                }
+            },
+            "processing_info": {
+                "zero_point": float(zero_point),
+                "exposure_time_s": float(exposure_time_s),
+                "image_dimensions": light_frame.shape,
+                "timestamp": timestamp,
+                "session_id": session_id
+            },
+            "metadata": metadata
+        }
         
-        # return json.dumps(response), 200
+        return json.dumps(response), 200
 
     except ValueError as ve:
         return json.dumps({"error": str(ve)}), 400
