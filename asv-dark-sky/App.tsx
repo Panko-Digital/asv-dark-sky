@@ -1,14 +1,8 @@
-import {
-  CameraMode,
-  CameraType,
-  CameraView,
-  useCameraPermissions,
-} from "expo-camera";
+import { CameraMode, CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Button,
   Platform,
   Pressable,
   StyleSheet,
@@ -17,7 +11,6 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import AntDesign from "@expo/vector-icons/AntDesign";
-// import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 
 export type ViewMode = "camera" | "review";
 
@@ -33,12 +26,49 @@ export type errorResponseFormat = {
 const SERVER_URL =
   "https://australia-southeast2-popkorn-472305.cloudfunctions.net/calculate_sky_brightness";
 
+const getMimeTypeFromUri = (uri?: string | null): string => {
+  if (!uri) {
+    return "image/jpeg";
+  }
+
+  const extension = uri.split("?")[0]?.split(".").pop()?.toLowerCase();
+
+  switch (extension) {
+    case "png":
+      return "image/png";
+    case "heic":
+      return "image/heic";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    default:
+      return "image/jpeg";
+  }
+};
+
+const sanitizeBase64Data = (data: string, uri?: string | null) => {
+  const withoutPrefix = data.replace(/^data:[^;]+;base64,/, "");
+  const stripped = withoutPrefix.replace(/\s+/g, "");
+  const paddingRemainder = stripped.length % 4;
+  const padded =
+    paddingRemainder === 0
+      ? stripped
+      : stripped + "=".repeat(4 - paddingRemainder);
+  const mimeType = getMimeTypeFromUri(uri);
+
+  return {
+    payload: padded,
+    dataUri: `data:${mimeType};base64,${padded}`,
+  };
+};
+
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const ref = useRef<CameraView>(null);
-  // const [uris, setUris] = useState<string[]>([]);
-  const [darkFrame, setDarkFrame] = useState<string | null>(null);
-  const [lightFrame, setLightFrame] = useState<string | null>(null);
+  const [lightFrameUri, setLightFrameUri] = useState<string | null>(null);
+  const [lightFrameBase64, setLightFrameBase64] = useState<string | null>(null);
+  const [darkFrameUri, setDarkFrameUri] = useState<string | null>(null);
+  const [darkFrameBase64, setDarkFrameBase64] = useState<string | null>(null);
 
   const [mode, setMode] = useState<CameraMode>("picture");
   const [frame, setFrame] = useState<"light" | "dark">("light");
@@ -80,14 +110,13 @@ export default function App() {
   }
 
   const reset = (label: string) => {
-    // setUris([]);
     if (label === "Sky Photo") {
-      setLightFrame(null);
+      setLightFrameUri(null);
+      setLightFrameBase64(null);
     } else {
-      setDarkFrame(null);
+      setDarkFrameUri(null);
+      setDarkFrameBase64(null);
     }
-    // setSQM(null);
-    // setError(null);
     setViewMode("review");
   };
 
@@ -98,23 +127,38 @@ export default function App() {
         base64: true,
         exif: false,
       });
-      console.log("Photo taken:", photo);
+
+      if (!photo || !photo.uri || !photo.base64) {
+        console.log("Missing URI or base64 data", photo);
+        Alert.alert(
+          "Error",
+          "Failed to capture photo data. Please try taking the picture again."
+        );
+        return;
+      }
+
+      console.log("Photo taken:", {
+        uri: photo.uri,
+        width: photo.width,
+        height: photo.height,
+        base64Length: photo.base64.length,
+      });
       console.log("Platform:", Platform.OS);
 
-      if (photo?.uri) {
-        console.log("Photo URI:", photo.uri);
-        console.log("URI accessible:", await checkUriAccessible(photo.uri));
-        if (frame === "light") {
-          setLightFrame(photo.uri);
-        } else {
-          setDarkFrame(photo.uri);
-        }
-        // setUris((prev) => [...prev, photo.uri]);
-        setViewMode("review");
+      const sanitized = sanitizeBase64Data(photo.base64, photo.uri);
+      console.log("Sanitized base64 length:", sanitized.payload.length);
+
+      console.log("Photo URI accessible:", await checkUriAccessible(photo.uri));
+
+      if (frame === "light") {
+        setLightFrameUri(photo.uri);
+        setLightFrameBase64(sanitized.dataUri);
       } else {
-        console.log("No photo URI received");
-        Alert.alert("Error", "Failed to capture photo - no URI received");
+        setDarkFrameUri(photo.uri);
+        setDarkFrameBase64(sanitized.dataUri);
       }
+
+      setViewMode("review");
     } catch (error) {
       console.error("Error taking picture:", error);
       Alert.alert("Camera Error", `Failed to take picture: ${error}`);
@@ -132,21 +176,28 @@ export default function App() {
   };
 
   const sendToServer = async () => {
-    // send uris to server
-    // let lightFrame = uris[0];
-    // let darkFrame = uris[1];
-    if (lightFrame && darkFrame) {
+    if (!lightFrameBase64 || !darkFrameBase64) {
+      Alert.alert(
+        "Missing images",
+        "Please capture both the sky and dark photos before sending."
+      );
+      return;
+    }
+
+    if (lightFrameUri && darkFrameUri) {
       setLoading(true);
       setError(null);
       setSQM(null);
+      const preparedLight = sanitizeBase64Data(lightFrameBase64, lightFrameUri);
+      const preparedDark = sanitizeBase64Data(darkFrameBase64, darkFrameUri);
       const response = await fetch(SERVER_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          light_image: lightFrame,
-          dark_image: darkFrame,
+          light_image: preparedLight.dataUri,
+          dark_image: preparedDark.dataUri,
           zero_point: 20.0,
           exposure_time_s: exposureTime / 1000,
           metadata: {
@@ -172,23 +223,24 @@ export default function App() {
   };
 
   const renderPictures = () => {
+    const frames = [
+      { uri: lightFrameUri, label: "Sky Photo" },
+      { uri: darkFrameUri, label: "Dark Photo" },
+    ];
+
     return (
       <View style={styles.reviewContainer}>
-        {[
-          { uri: lightFrame, label: "Sky Photo" },
-          { uri: darkFrame, label: "Dark Photo" },
-        ]
-          // .filter((f) => f.uri)
-          .map((f) => (
-            <View key={f.uri!} style={styles.imageContainer}>
-              <Text style={styles.imageLabel}>{f.label}</Text>
-              {f.label !== "Sky Photo" && (
-                <Text style={styles.shieldLabel}>(Shield camera lenses)</Text>
-              )}
-              {f.uri ? (
-                <View>
+        {frames.map((f) => (
+          <View key={f.label} style={styles.imageContainer}>
+            <Text style={styles.imageLabel}>{f.label}</Text>
+            {f.label !== "Sky Photo" && (
+              <Text style={styles.shieldLabel}>(Shield camera lenses)</Text>
+            )}
+            {f.uri ? (
+              <View>
+                <View style={[styles.dashedBorder, styles.previewFrame]}>
                   <Image
-                    source={{ uri: f.uri! }}
+                    source={{ uri: f.uri }}
                     contentFit="cover"
                     style={styles.previewImage}
                     onError={() => {
@@ -201,54 +253,55 @@ export default function App() {
                       console.log(`Image loaded successfully: ${f.uri}`);
                     }}
                   />
-                  <Pressable
-                    onPress={() => {
-                      reset(f.label);
-                    }}
+                </View>
+                <Pressable
+                  onPress={() => {
+                    reset(f.label);
+                  }}
+                  style={{
+                    marginTop: 10,
+                    paddingVertical: 0,
+                    paddingHorizontal: 20,
+                  }}
+                >
+                  <Text
                     style={{
-                      marginTop: 10,
-                      paddingVertical: 0,
-                      paddingHorizontal: 20,
+                      color: "#ff0000",
+                      textDecorationLine: "underline",
+                      textAlign: "center",
                     }}
                   >
-                    <Text
-                      style={{
-                        color: "#ff0000",
-                        textDecorationLine: "underline",
-                        textAlign: "center",
-                      }}
-                    >
-                      Clear
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <View>
-                  <Pressable
-                    onPress={() => {
-                      setMode("picture");
-                      setFrame(f.label === "Sky Photo" ? "light" : "dark");
-                      setViewMode("camera");
+                    Clear
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View>
+                <Pressable
+                  onPress={() => {
+                    setMode("picture");
+                    setFrame(f.label === "Sky Photo" ? "light" : "dark");
+                    setViewMode("camera");
+                  }}
+                  style={[styles.emptyImage, styles.dashedBorder]}
+                >
+                  <Text
+                    style={{
+                      color: "#ff0000",
+                      fontSize: 20,
+                      textAlign: "center",
                     }}
-                    style={[styles.emptyImage, styles.dashedBorder]}
                   >
-                    <Text
-                      style={{
-                        color: "#ff0000",
-                        fontSize: 20,
-                        textAlign: "center",
-                      }}
-                    >
-                      <AntDesign name="camera" size={24} color="red" />
-                    </Text>
-                  </Pressable>
-                  <View style={{ marginTop: 10 }}>
-                    <Text>" "</Text>
-                  </View>
+                    <AntDesign name="camera" size={24} color="red" />
+                  </Text>
+                </Pressable>
+                <View style={{ marginTop: 10 }}>
+                  <Text>" "</Text>
                 </View>
-              )}
-            </View>
-          ))}
+              </View>
+            )}
+          </View>
+        ))}
 
         {!loading && (
           <Pressable
@@ -266,7 +319,7 @@ export default function App() {
                 alignItems: "center",
               },
               pressed && { opacity: 0.6 },
-              !(lightFrame && darkFrame) && {
+              !(lightFrameBase64 && darkFrameBase64) && {
                 opacity: 0,
                 pointerEvents: "none",
               },
@@ -440,14 +493,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   previewImage: {
+    width: 192,
+    height: 192,
+    borderRadius: 96,
+    aspectRatio: 1,
+  },
+  previewFrame: {
     width: 200,
     height: 200,
     borderRadius: 100,
-    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 10,
-    borderStyle: "dashed",
+    padding: 4,
     borderWidth: 2,
-    borderColor: "#ff0000",
   },
   emptyImage: {
     width: 200,
