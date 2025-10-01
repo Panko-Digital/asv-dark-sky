@@ -1,0 +1,31 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test files and payloads
+payload.json
+test_server.py
+test_firestore.py
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+CODE_REVIEW.md
+README.md
+
+# OS files
+.DS_Store
+Thumbs.db

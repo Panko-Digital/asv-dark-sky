@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """
 Test server for the sky brightness calculation function.
+
+NOTE: This test script will attempt to write to Firestore.
+Make sure you have authenticated with:
+  gcloud auth application-default login
+
+To test without Firestore, you can temporarily comment out the Firestore
+code in main.py or set up local Firestore emulator.
 """
 import json
 import sys
@@ -8,8 +15,9 @@ from main import calculate_sky_brightness
 
 class MockRequest:
     """Mock request object for testing"""
-    def __init__(self, json_data):
+    def __init__(self, json_data, method='POST'):
         self._json = json_data
+        self.method = method
 
     def get_json(self, silent=True):
         return self._json
@@ -30,10 +38,19 @@ def test_with_payload():
         request = MockRequest(payload)
 
         # Test the function
-        result, status_code = calculate_sky_brightness(request)
+        result_tuple = calculate_sky_brightness(request)
+        
+        # Handle the response tuple (body, status_code, headers)
+        if len(result_tuple) == 3:
+            result, status_code, headers = result_tuple
+        else:
+            result, status_code = result_tuple
+            headers = {}
 
         print(f"\n✅ SUCCESS!")
         print(f"Status Code: {status_code}")
+        if headers:
+            print(f"Headers: {headers}")
         print(f"Result: {result}")
 
         # Parse and display the result
@@ -42,6 +59,10 @@ def test_with_payload():
             print(f"\n📈 Sky Quality Results:")
             print(f"   Median Sky Brightness: {result_data['median_sky_brightness_dn']:.2f} DN")
             print(f"   Sky Quality Meter: {result_data['sky_quality_meter']:.2f} mag/arcsec²")
+            if 'firestore_id' in result_data:
+                print(f"   Firestore Document ID: {result_data['firestore_id']}")
+            if 'metadata' in result_data:
+                print(f"   Metadata: {json.dumps(result_data['metadata'], indent=2)}")
 
         return True
 
@@ -53,16 +74,27 @@ def test_with_payload():
 
 def start_local_server():
     """Start a local Flask server for testing"""
-    from flask import Flask, request, jsonify
+    try:
+        from flask import Flask, request, jsonify
+    except ImportError:
+        print("❌ Flask not installed. Install with: pip install flask")
+        return
 
     app = Flask(__name__)
 
-    @app.route('/calculate', methods=['POST'])
+    @app.route('/calculate', methods=['POST', 'OPTIONS'])
     def calculate():
         """HTTP endpoint for sky brightness calculation"""
         try:
-            result, status_code = calculate_sky_brightness(request)
-            return result, status_code
+            result_tuple = calculate_sky_brightness(request)
+            
+            # Handle the response tuple (body, status_code, headers)
+            if len(result_tuple) == 3:
+                result, status_code, headers = result_tuple
+                return result, status_code, headers
+            else:
+                result, status_code = result_tuple
+                return result, status_code
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
