@@ -210,8 +210,9 @@ export default function MapScreen() {
                 longitude: measurement.location.longitude,
               }}
               pinColor={getMarkerColor(measurement.sky_quality_meter)}
+              tracksViewChanges={false}
             >
-              <Callout>
+              <Callout tooltip={false}>
                 <View style={styles.callout}>
                   <Text style={styles.calloutTitle}>
                     SQM: {measurement.sky_quality_meter.toFixed(2)} mag/arcsec²
@@ -240,22 +241,6 @@ export default function MapScreen() {
           </Text>
         </View>
       )}
-
-      <View style={styles.legend}>
-        <Text style={styles.legendTitle}>Sky Quality Legend:</Text>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: "#00ff00" }]} />
-          <Text style={styles.legendText}>Excellent (≥21)</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: "#ffff00" }]} />
-          <Text style={styles.legendText}>Fair (19-20)</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: "#ff0000" }]} />
-          <Text style={styles.legendText}>Poor (&lt;18)</Text>
-        </View>
-      </View>
     </View>
   );
 }
@@ -282,6 +267,11 @@ const styles = StyleSheet.create({
   callout: {
     padding: 10,
     minWidth: 200,
+    maxWidth: 250,
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#cccccc",
   },
   calloutTitle: {
     fontSize: 16,
@@ -323,36 +313,5 @@ const styles = StyleSheet.create({
     color: "#ff0000",
     fontSize: 14,
     textAlign: "center",
-  },
-  legend: {
-    position: "absolute",
-    bottom: 20,
-    right: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    padding: 15,
-    borderRadius: 10,
-    borderColor: "#ff0000",
-    borderWidth: 1,
-  },
-  legendTitle: {
-    color: "#ff0000",
-    fontSize: 14,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
-  },
-  legendText: {
-    color: "#ff0000",
-    fontSize: 12,
   },
 });

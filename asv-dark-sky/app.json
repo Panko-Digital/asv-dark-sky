@@ -44,7 +44,8 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
-      "package": "com.stesmi99.asvdarksky"
+      "package": "com.stesmi99.asvdarksky",
+      "ndkVersion": "27.0.12077973"
     }
   },
   "extra": {

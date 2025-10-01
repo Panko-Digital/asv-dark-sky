@@ -133,11 +133,6 @@ export default function HistoryScreen() {
 
   const renderEmpty = () => (
     <View style={styles.emptyStateContainer}>
-      <View style={styles.emptyTableHeader}>
-        <Text style={styles.emptyTableHeaderText}>Date</Text>
-        <Text style={styles.emptyTableHeaderText}>SQM</Text>
-        <Text style={styles.emptyTableHeaderText}>Location</Text>
-      </View>
       <View style={styles.emptyTableBody}>
         <Text style={styles.emptyText}>No measurements yet</Text>
         <Text style={styles.emptySubtext}>
@@ -282,6 +277,7 @@ const styles = StyleSheet.create({
   emptyStateContainer: {
     flex: 1,
     paddingTop: 20,
+    marginBottom: 20,
   },
   emptyTableHeader: {
     flexDirection: "row",
