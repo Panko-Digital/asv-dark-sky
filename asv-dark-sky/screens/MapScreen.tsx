@@ -212,18 +212,21 @@ export default function MapScreen() {
               pinColor={getMarkerColor(measurement.sky_quality_meter)}
               tracksViewChanges={false}
             >
-              <Callout tooltip={false}>
-                <View style={styles.callout}>
-                  <Text style={styles.calloutTitle}>
-                    SQM: {measurement.sky_quality_meter.toFixed(2)} mag/arcsec²
-                  </Text>
-                  <Text style={styles.calloutText}>
-                    Brightness:{" "}
-                    {measurement.median_sky_brightness_dn.toFixed(2)} DN
-                  </Text>
-                  <Text style={styles.calloutDate}>
-                    {new Date(measurement.created_at).toLocaleDateString()}
-                  </Text>
+              <Callout>
+                <View style={styles.calloutContainer}>
+                  <View style={styles.callout}>
+                    <Text style={styles.calloutTitle}>
+                      SQM: {measurement.sky_quality_meter.toFixed(2)}{" "}
+                      mag/arcsec²
+                    </Text>
+                    <Text style={styles.calloutText}>
+                      Brightness:{" "}
+                      {measurement.median_sky_brightness_dn.toFixed(2)} DN
+                    </Text>
+                    <Text style={styles.calloutDate}>
+                      {new Date(measurement.created_at).toLocaleDateString()}
+                    </Text>
+                  </View>
                 </View>
               </Callout>
             </Marker>
@@ -264,14 +267,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 10,
   },
+  calloutContainer: {
+    width: 250,
+  },
   callout: {
-    padding: 10,
-    minWidth: 200,
-    maxWidth: 250,
+    padding: 12,
     backgroundColor: "#ffffff",
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: "#cccccc",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   calloutTitle: {
     fontSize: 16,
