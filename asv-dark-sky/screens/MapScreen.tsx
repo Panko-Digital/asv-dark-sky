@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, View, ActivityIndicator, Text, Alert } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE, Callout } from "react-native-maps";
+import {
+  StyleSheet,
+  View,
+  ActivityIndicator,
+  Text,
+  Alert,
+  Platform,
+} from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { useFocusEffect } from "@react-navigation/native";
 import React from "react";
 
@@ -202,6 +209,8 @@ export default function MapScreen() {
         {measurements.map((measurement) => {
           if (!measurement.location) return null;
 
+          const sqm = measurement.sky_quality_meter;
+
           return (
             <Marker
               key={measurement.id}
@@ -209,26 +218,13 @@ export default function MapScreen() {
                 latitude: measurement.location.latitude,
                 longitude: measurement.location.longitude,
               }}
-              pinColor={getMarkerColor(measurement.sky_quality_meter)}
-              tracksViewChanges={false}
+              anchor={{ x: 0.5, y: 1.5 }}
             >
-              <Callout>
-                <View style={styles.calloutContainer}>
-                  <View style={styles.callout}>
-                    <Text style={styles.calloutTitle}>
-                      SQM: {measurement.sky_quality_meter.toFixed(2)}{" "}
-                      mag/arcsec²
-                    </Text>
-                    <Text style={styles.calloutText}>
-                      Brightness:{" "}
-                      {measurement.median_sky_brightness_dn.toFixed(2)} DN
-                    </Text>
-                    <Text style={styles.calloutDate}>
-                      {new Date(measurement.created_at).toLocaleDateString()}
-                    </Text>
-                  </View>
+              <View style={styles.markerContainer}>
+                <View style={styles.markerCircle}>
+                  <Text style={styles.markerText}>{sqm.toFixed(1)}</Text>
                 </View>
-              </Callout>
+              </View>
             </Marker>
           );
         })}
@@ -267,39 +263,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 10,
   },
-  calloutContainer: {
-    width: 250,
+  markerContainer: {
+    width: 80,
+    height: 80,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
-  callout: {
-    padding: 12,
-    backgroundColor: "#ffffff",
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: "#cccccc",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  markerCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "transparent",
+    borderWidth: 3,
+    borderColor: "#ff0000",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    left: 0,
+    top: 0,
   },
-  calloutTitle: {
-    fontSize: 16,
+  markerText: {
+    color: "#ff0000",
+    fontSize: 11,
     fontWeight: "bold",
-    marginBottom: 5,
-    color: "#000000",
-  },
-  calloutText: {
-    fontSize: 14,
-    color: "#333333",
-    marginBottom: 3,
-  },
-  calloutDate: {
-    fontSize: 12,
-    color: "#666666",
-    marginTop: 5,
   },
   noDataContainer: {
     position: "absolute",
