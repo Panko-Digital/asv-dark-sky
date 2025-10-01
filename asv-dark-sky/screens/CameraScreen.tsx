@@ -1,5 +1,6 @@
 import { CameraMode, CameraView, useCameraPermissions } from "expo-camera";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
+import * as Location from "expo-location";
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +12,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import { saveMeasurement } from "../utils/storage";
 
 export type ViewMode = "camera" | "review";
 
@@ -77,6 +79,31 @@ export default function CameraScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [exposureTime, setExposureTime] = useState<number>(3000); // in milliseconds
+  const [location, setLocation] = useState<Location.LocationObject | null>(
+    null
+  );
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocationError("Permission to access location was denied");
+          return;
+        }
+
+        const currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setLocation(currentLocation);
+        console.log("Location acquired:", currentLocation.coords);
+      } catch (err) {
+        console.error("Error getting location:", err);
+        setLocationError("Failed to get location");
+      }
+    })();
+  }, []);
 
   if (!permission) {
     return null;
@@ -190,6 +217,17 @@ export default function CameraScreen() {
       setSQM(null);
       const preparedLight = sanitizeBase64Data(lightFrameBase64, lightFrameUri);
       const preparedDark = sanitizeBase64Data(darkFrameBase64, darkFrameUri);
+
+      const currentTimestamp = new Date().toISOString();
+      const locationData = location
+        ? {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            altitude: location.coords.altitude,
+            accuracy: location.coords.accuracy,
+          }
+        : null;
+
       const response = await fetch(SERVER_URL, {
         method: "POST",
         headers: {
@@ -201,8 +239,8 @@ export default function CameraScreen() {
           zero_point: 20.0,
           exposure_time_s: exposureTime / 1000,
           metadata: {
-            location: "optional_location_info",
-            timestamp: "optional_timestamp",
+            location: locationData,
+            timestamp: currentTimestamp,
           },
         }),
       });
@@ -217,6 +255,19 @@ export default function CameraScreen() {
         const data: responseFormat = await response.json();
 
         setSQM(data.sky_quality_meter);
+
+        // Save measurement to local storage
+        try {
+          await saveMeasurement(
+            locationData,
+            data.sky_quality_meter,
+            data.median_sky_brightness_dn
+          );
+          console.log("Measurement saved to history");
+        } catch (saveError) {
+          console.error("Failed to save measurement:", saveError);
+          // Don't show error to user - just log it
+        }
       }
     }
   };

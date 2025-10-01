@@ -12,6 +12,14 @@
           "locationPermission": "Allow $(PRODUCT_NAME) to access your location",
           "imagePickerPermission": "Allow $(PRODUCT_NAME) to access your photos"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to tag sky quality measurements with geographic coordinates.",
+          "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to use your location to tag sky quality measurements with geographic coordinates.",
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to tag sky quality measurements with geographic coordinates."
+        }
       ]
     ],
     "extra": {
@@ -22,7 +30,8 @@
     "ios": {
       "bundleIdentifier": "com.stesmi99.asvdarksky",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to tag sky quality measurements with geographic coordinates."
       }
     },
     "runtimeVersion": "1.0.0",
@@ -31,7 +40,9 @@
     },
     "android": {
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "package": "com.stesmi99.asvdarksky"
     }
