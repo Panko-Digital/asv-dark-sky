@@ -126,7 +126,7 @@ export default function HistoryScreen() {
           pressed && { opacity: 0.5 },
         ]}
       >
-        <Text style={styles.deleteButtonText}>×</Text>
+        <Text style={styles.deleteButtonText}>&times;</Text>
       </Pressable>
     </View>
   );
@@ -392,5 +392,7 @@ const styles = StyleSheet.create({
     color: "#ff0000",
     fontSize: 20,
     fontWeight: "bold",
+    position: "relative",
+    top: -4,
   },
 });

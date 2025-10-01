@@ -4,28 +4,21 @@ import numpy as np
 import json
 import base64
 from datetime import datetime
+import os
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 # Initialize Firebase Admin (only once)
 if not firebase_admin._apps:
     # When deployed to Cloud Functions, uses Application Default Credentials
-    # Initialize with project ID and database name
     firebase_admin.initialize_app(options={
         'projectId': 'popkorn-472305',
-        'databaseURL': 'https://asv-dark-sky.firebaseio.com'
     })
 
-# Get Firestore client with named database
-def get_firestore_client():
-    """Get Firestore client for the asv-dark-sky database"""
-    try:
-        # Try to get client with database parameter (firebase-admin >= 6.5.0)
-        return firestore.client(database='asv-dark-sky')
-    except TypeError:
-        # If database parameter not supported, use client without it
-        # This will work if asv-dark-sky is set as default
-        return firestore.client()
+# Get Firestore client
+# Note: The database parameter is only supported in firebase-admin >= 6.5.0
+# and may not work in all Cloud Functions environments
+db = firestore.client()
 
 @functions_framework.http
 def calculate_sky_brightness(request):
@@ -130,9 +123,7 @@ def calculate_sky_brightness(request):
         instrumental_magnitude = -2.5 * np.log10(median_value / exposure_time_s)
         sky_quality_meter = instrumental_magnitude + zero_point
         
-        # Save measurement to Firestore using the named database
-        db = get_firestore_client()
-        
+        # Save measurement to Firestore using the global db client
         measurement_data = {
             "median_sky_brightness_dn": float(median_value),
             "sky_quality_meter": float(sky_quality_meter),
