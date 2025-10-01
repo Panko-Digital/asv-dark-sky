@@ -8,6 +8,27 @@ ENV['RCT_NEW_ARCH_ENABLED'] ||= '0' if podfile_properties['newArchEnabled'] == '
 ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] ||= podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
 ENV['RCT_USE_RN_DEP'] ||= '1' if podfile_properties['ios.buildReactNativeFromSource'] != 'true' && podfile_properties['newArchEnabled'] != 'false'
 ENV['RCT_USE_PREBUILT_RNCORE'] ||= '1' if podfile_properties['ios.buildReactNativeFromSource'] != 'true' && podfile_properties['newArchEnabled'] != 'false'
+
+# Load Google Maps API key from .env file
+def load_env_variables
+  env_file = File.join(__dir__, '../.env')
+  if File.exist?(env_file)
+    File.readlines(env_file).each do |line|
+      line = line.strip
+      next if line.empty? || line.start_with?('#')
+      key, value = line.split('=', 2)
+      if key == 'EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY'
+        ENV['GOOGLE_MAPS_API_KEY_IOS'] = value
+        puts "✅ Loaded Google Maps API key from .env"
+      end
+    end
+  else
+    puts "⚠️  Warning: .env file not found at #{env_file}"
+  end
+end
+
+load_env_variables()
+
 platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 
 prepare_react_native_project!

@@ -164,3 +164,89 @@ def calculate_sky_brightness(request):
         return (json.dumps({"error": str(ve)}), 400, headers)
     except Exception as e:
         return (json.dumps({"error": f"An unexpected error occurred: {str(e)}"}), 500, headers)
+
+
+@functions_framework.http
+def get_measurements(request):
+    """
+    HTTP Cloud Function to retrieve all measurements from Firestore.
+    
+    Supports optional query parameters:
+    - limit: Maximum number of measurements to return (default: 100)
+    - order: Sort order, either 'asc' or 'desc' (default: 'desc')
+    
+    Returns:
+        JSON array of measurements with GPS coordinates
+    """
+    # Set CORS headers for all responses
+    if request.method == 'OPTIONS':
+        # Preflight request
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '3600'
+        }
+        return ('', 204, headers)
+
+    # Set CORS headers for main request
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        # Get query parameters
+        limit = int(request.args.get('limit', 100))
+        order = request.args.get('order', 'desc')
+        
+        # Query Firestore measurements collection
+        measurements_ref = db.collection('measurements')
+        
+        # Order by created_at timestamp
+        if order == 'asc':
+            query = measurements_ref.order_by('created_at', direction=firestore.Query.ASCENDING).limit(limit)
+        else:
+            query = measurements_ref.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+        
+        # Execute query
+        docs = query.stream()
+        
+        # Build response array
+        measurements = []
+        for doc in docs:
+            data = doc.to_dict()
+            
+            # Extract GPS coordinates from metadata if available
+            location = None
+            if 'metadata' in data and 'location' in data['metadata']:
+                loc = data['metadata']['location']
+                if isinstance(loc, dict) and 'latitude' in loc and 'longitude' in loc:
+                    location = {
+                        'latitude': loc['latitude'],
+                        'longitude': loc['longitude']
+                    }
+            
+            measurement = {
+                'id': doc.id,
+                'sky_quality_meter': data.get('sky_quality_meter'),
+                'median_sky_brightness_dn': data.get('median_sky_brightness_dn'),
+                'instrumental_magnitude': data.get('instrumental_magnitude'),
+                'zero_point': data.get('zero_point'),
+                'exposure_time_s': data.get('exposure_time_s'),
+                'location': location,
+                'created_at': data.get('created_at'),
+                'timestamp': str(data.get('timestamp')) if data.get('timestamp') else None
+            }
+            
+            measurements.append(measurement)
+        
+        response = {
+            'count': len(measurements),
+            'measurements': measurements
+        }
+        
+        return (json.dumps(response), 200, headers)
+        
+    except Exception as e:
+        return (json.dumps({"error": f"An error occurred: {str(e)}"}), 500, headers)

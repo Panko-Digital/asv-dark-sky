@@ -54,6 +54,8 @@
     <string>Allow $(PRODUCT_NAME) to use your location to tag sky quality measurements with geographic coordinates.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <key>GoogleMapsApiKey</key>
+    <string>$(GOOGLE_MAPS_API_KEY_IOS)</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UILaunchStoryboardName</key>
