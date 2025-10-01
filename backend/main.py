@@ -1,12 +1,19 @@
 import functions_framework
-from google.cloud import storage
 import cv2
 import numpy as np
 import json
-import os
-import uuid
-from datetime import datetime, timezone
 import base64
+from datetime import datetime
+import firebase_admin
+from firebase_admin import credentials, firestore
+
+# Initialize Firebase Admin (only once)
+if not firebase_admin._apps:
+    # When deployed to Cloud Functions, uses Application Default Credentials
+    # Explicitly specify project ID (optional but recommended for clarity)
+    firebase_admin.initialize_app(options={
+        'projectId': 'popkorn-472305',
+    })
 
 @functions_framework.http
 def calculate_sky_brightness(request):
@@ -29,11 +36,28 @@ def calculate_sky_brightness(request):
     Returns:
         JSON response with upload paths and calculation results
     """
+    # Set CORS headers for all responses
+    if request.method == 'OPTIONS':
+        # Preflight request
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '3600'
+        }
+        return ('', 204, headers)
+
+    # Set CORS headers for main request
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+    }
+    
     try:
         # Get data from the JSON request body
         request_json = request.get_json(silent=True)
         if not request_json:
-            return json.dumps({"error": "No JSON payload found. Please provide images and parameters."}), 400
+            return (json.dumps({"error": "No JSON payload found. Please provide images and parameters."}), 400, headers)
 
         # Extract required parameters
         light_image_b64 = request_json.get("light_image")
@@ -43,21 +67,9 @@ def calculate_sky_brightness(request):
         metadata = request_json.get("metadata", {})
 
         if not light_image_b64 or not dark_image_b64:
-            return json.dumps({"error": "Both light_image and dark_image are required as base64 encoded data"}), 400
+            return (json.dumps({"error": "Both light_image and dark_image are required as base64 encoded data"}), 400, headers)
 
-        # Initialize Google Cloud Storage client
-        bucket_name = "asvgeelong-sqm"
-        storage_client = storage.Client()
-        bucket = storage_client.bucket(bucket_name)
-
-        # Generate unique filenames with timestamp
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        session_id = str(uuid.uuid4())[:8]
-        
-        light_filename = f"uploads/{timestamp}_{session_id}_light.jpg"
-        dark_filename = f"uploads/{timestamp}_{session_id}_dark.jpg"
-
-        # Helper function to decode, validate and upload image
+        # Helper function to decode and validate image without uploading
         def decode_image_from_base64(base64_data, description):
             try:
                 # Remove data URL prefix if present (e.g., "data:image/jpeg;base64,")
@@ -73,26 +85,22 @@ def calculate_sky_brightness(request):
                 if img is None:
                     raise ValueError(f"Could not decode image data for {description}")
                 
-                # Upload to GCS
-                blob = bucket.blob(description)
-                blob.upload_from_string(image_bytes, content_type='image/jpeg')
-                
-                return img, blob.public_url
+                return img
                 
             except Exception as e:
                 raise ValueError(f"Error processing image {description}: {str(e)}")
 
-        # Upload both images and get the decoded image data
-        light_frame, light_url = decode_image_from_base64(light_image_b64, light_filename)
-        dark_frame, dark_url = decode_image_from_base64(dark_image_b64, dark_filename)
+        # Decode both images (no storage upload)
+        light_frame = decode_image_from_base64(light_image_b64, "light frame")
+        dark_frame = decode_image_from_base64(dark_image_b64, "dark frame")
 
         # Ensure images are the same size
         if light_frame.shape != dark_frame.shape:
-            return json.dumps({
+            return (json.dumps({
                 "error": "Images must have the same dimensions.",
                 "light_shape": light_frame.shape,
                 "dark_shape": dark_frame.shape
-            }), 400
+            }), 400, headers)
 
         # Perform the dark frame subtraction
         subtracted_image = cv2.subtract(light_frame.astype(np.int16), dark_frame.astype(np.int16))
@@ -102,42 +110,53 @@ def calculate_sky_brightness(request):
         
         # Calculate instrumental magnitude and SQM score
         if median_value <= 0:
-            return json.dumps({
+            return (json.dumps({
                 "error": "Median pixel value is non-positive, cannot calculate calibrated magnitude.",
                 "median_value": float(median_value)
-            }), 400
+            }), 400, headers)
 
         instrumental_magnitude = -2.5 * np.log10(median_value / exposure_time_s)
         sky_quality_meter = instrumental_magnitude + zero_point
         
-        # Prepare response with upload info and calculation results
+        # Save measurement to Firestore (using the 'asv-dark-sky' database)
+        db = firestore.client(database='asv-dark-sky')
+        measurement_data = {
+            "median_sky_brightness_dn": float(median_value),
+            "sky_quality_meter": float(sky_quality_meter),
+            "instrumental_magnitude": float(instrumental_magnitude),
+            "zero_point": float(zero_point),
+            "exposure_time_s": float(exposure_time_s),
+            "image_dimensions": {
+                "height": int(light_frame.shape[0]),
+                "width": int(light_frame.shape[1]),
+                "channels": int(light_frame.shape[2]) if len(light_frame.shape) > 2 else 1
+            },
+            "metadata": metadata,
+            "timestamp": firestore.SERVER_TIMESTAMP,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        # Add to 'measurements' collection
+        doc_ref = db.collection('measurements').add(measurement_data)
+        measurement_id = doc_ref[1].id
+        
+        # Prepare response with calculation results (no upload info)
         response = {
             "median_sky_brightness_dn": float(median_value),
             "sky_quality_meter": float(sky_quality_meter),
             "instrumental_magnitude": float(instrumental_magnitude),
-            "uploaded_files": {
-                "light_frame": {
-                    "filename": light_filename,
-                    "url": light_url
-                },
-                "dark_frame": {
-                    "filename": dark_filename,
-                    "url": dark_url
-                }
-            },
             "processing_info": {
                 "zero_point": float(zero_point),
                 "exposure_time_s": float(exposure_time_s),
-                "image_dimensions": light_frame.shape,
-                "timestamp": timestamp,
-                "session_id": session_id
+                "image_dimensions": light_frame.shape
             },
-            "metadata": metadata
+            "metadata": metadata,
+            "firestore_id": measurement_id
         }
         
-        return json.dumps(response), 200
+        return (json.dumps(response), 200, headers)
 
     except ValueError as ve:
-        return json.dumps({"error": str(ve)}), 400
+        return (json.dumps({"error": str(ve)}), 400, headers)
     except Exception as e:
-        return json.dumps({"error": f"An unexpected error occurred: {str(e)}"}), 500
+        return (json.dumps({"error": f"An unexpected error occurred: {str(e)}"}), 500, headers)
