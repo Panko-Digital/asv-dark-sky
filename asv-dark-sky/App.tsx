@@ -1,14 +1,17 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { StatusBar } from "react-native";
+import { StatusBar, Platform } from "react-native";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import CameraScreen from "./screens/CameraScreen";
-import MapScreen from "./screens/MapScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import InfoScreen from "./screens/InfoScreen";
+
+// Conditionally import MapScreen only on native platforms
+const MapScreen =
+  Platform.OS === "web" ? () => null : require("./screens/MapScreen").default;
 
 const Tab = createBottomTabNavigator();
 
@@ -46,16 +49,18 @@ export default function App() {
             ),
           }}
         />
-        <Tab.Screen
-          name="Map"
-          component={MapScreen}
-          options={{
-            headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="map" size={size} color={color} />
-            ),
-          }}
-        />
+        {Platform.OS !== "web" && (
+          <Tab.Screen
+            name="Map"
+            component={MapScreen}
+            options={{
+              headerShown: false,
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="map" size={size} color={color} />
+              ),
+            }}
+          />
+        )}
         <Tab.Screen
           name="History"
           component={HistoryScreen}
