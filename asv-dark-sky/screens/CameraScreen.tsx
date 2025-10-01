@@ -112,7 +112,9 @@ export default function CameraScreen() {
   if (!permission.granted) {
     return (
       <View style={styles.container}>
-        <Text style={{ textAlign: "center", color: "#ff0000ff" }}>
+        <Text
+          style={{ textAlign: "center", color: "#ff0000ff", marginBottom: 20 }}
+        >
           This app needs your permission to use the camera
         </Text>
         <Pressable

@@ -1,4 +1,4 @@
 functions-framework
 opencv-python-headless
 numpy
-firebase-admin
+firebase-admin>=6.5.0
