@@ -106,23 +106,18 @@ export default function HistoryScreen() {
 
   const renderItem = ({ item }: { item: SQMMeasurement }) => (
     <View style={styles.row}>
-      <View style={styles.rowContent}>
-        <View style={styles.cell}>
-          <Text style={styles.cellLabel}>Date</Text>
-          <Text style={styles.cellValue}>{formatDate(item.timestamp)}</Text>
-        </View>
-        <View style={styles.cell}>
-          <Text style={styles.cellLabel}>SQM</Text>
-          <Text style={[styles.cellValue, styles.sqmValue]}>
-            {item.sqm.toFixed(2)}
-          </Text>
-        </View>
-        <View style={styles.cell}>
-          <Text style={styles.cellLabel}>Location</Text>
-          <Text style={styles.cellValueSmall}>
-            {formatLocation(item.location)}
-          </Text>
-        </View>
+      <View style={styles.cell}>
+        <Text style={styles.cellValue} numberOfLines={2}>
+          {formatDate(item.timestamp)}
+        </Text>
+      </View>
+      <View style={styles.cellSqm}>
+        <Text style={styles.sqmValue}>{item.sqm.toFixed(2)}</Text>
+      </View>
+      <View style={styles.cellLocation}>
+        <Text style={styles.cellValueSmall} numberOfLines={1}>
+          {formatLocation(item.location)}
+        </Text>
       </View>
       <Pressable
         onPress={() => handleDeleteItem(item.id)}
@@ -131,7 +126,7 @@ export default function HistoryScreen() {
           pressed && { opacity: 0.5 },
         ]}
       >
-        <Text style={styles.deleteButtonText}>Delete</Text>
+        <Text style={styles.deleteButtonText}>×</Text>
       </Pressable>
     </View>
   );
@@ -148,6 +143,23 @@ export default function HistoryScreen() {
         <Text style={styles.emptySubtext}>
           Take some sky quality measurements to see them appear here
         </Text>
+      </View>
+    </View>
+  );
+
+  const renderHeader = () => (
+    <View style={styles.tableHeader}>
+      <View style={styles.headerCell}>
+        <Text style={styles.headerText}>Date</Text>
+      </View>
+      <View style={styles.headerCellSqm}>
+        <Text style={styles.headerText}>SQM</Text>
+      </View>
+      <View style={styles.headerCellLocation}>
+        <Text style={styles.headerText}>Location</Text>
+      </View>
+      <View style={styles.headerCellDelete}>
+        <Text style={styles.headerText}></Text>
       </View>
     </View>
   );
@@ -178,6 +190,7 @@ export default function HistoryScreen() {
           data={history}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={
             history.length === 0
@@ -231,7 +244,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   listContent: {
-    padding: 10,
+    paddingBottom: 10,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: "#1a0000",
+    borderBottomWidth: 2,
+    borderBottomColor: "#ff0000",
+  },
+  headerCell: {
+    flex: 2,
+    paddingRight: 8,
+  },
+  headerCellSqm: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerCellLocation: {
+    flex: 2,
+    paddingRight: 8,
+  },
+  headerCellDelete: {
+    width: 32,
+  },
+  headerText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#ff0000",
+    textTransform: "uppercase",
   },
   emptyListContainer: {
     flex: 1,
@@ -294,19 +337,28 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   row: {
-    backgroundColor: "#1a0000",
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-    marginHorizontal: 10,
-    borderWidth: 1,
-    borderColor: "#ff0000",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ff0000",
+    backgroundColor: "#000000",
   },
   rowContent: {
     marginBottom: 10,
   },
   cell: {
-    marginBottom: 8,
+    flex: 2,
+    paddingRight: 8,
+  },
+  cellSqm: {
+    flex: 1,
+    alignItems: "center",
+  },
+  cellLocation: {
+    flex: 2,
+    paddingRight: 8,
   },
   cellLabel: {
     fontSize: 12,
@@ -315,27 +367,30 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   cellValue: {
-    fontSize: 16,
+    fontSize: 12,
     color: "#ff0000",
   },
   cellValueSmall: {
-    fontSize: 14,
+    fontSize: 11,
     color: "#ff0000",
   },
   sqmValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "bold",
+    color: "#ff0000",
   },
   deleteButton: {
-    alignSelf: "flex-end",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: "#ff0000",
-    borderRadius: 4,
+    borderRadius: 16,
   },
   deleteButtonText: {
     color: "#ff0000",
-    fontSize: 12,
+    fontSize: 20,
+    fontWeight: "bold",
   },
 });

@@ -395,7 +395,9 @@ export default function CameraScreen() {
             <ActivityIndicator size="large" color="red" />
           </View>
         ) : (
-          SQM && (
+          SQM &&
+          lightFrameBase64 &&
+          darkFrameBase64 && (
             <Text
               style={{
                 textAlign: "center",
