@@ -136,7 +136,7 @@ export default function HistoryScreen() {
       <View style={styles.emptyTableBody}>
         <Text style={styles.emptyText}>No measurements yet</Text>
         <Text style={styles.emptySubtext}>
-          Take some sky quality measurements to see them appear here
+          Take some sky quality meter readings to see them appear here
         </Text>
       </View>
     </View>
@@ -307,10 +307,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     marginHorizontal: 10,
     backgroundColor: "#0a0000",
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+    borderRadius: 8,
     borderWidth: 1,
-    borderTopWidth: 0,
+    borderStyle: "dashed",
     borderColor: "#ff0000",
     paddingVertical: 60,
   },

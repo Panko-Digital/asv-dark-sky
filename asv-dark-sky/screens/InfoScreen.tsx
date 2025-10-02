@@ -4,7 +4,7 @@ export default function InfoScreen() {
   return (
     <ScrollView style={styles.scrollContainer}>
       <View style={styles.container}>
-        <Text style={styles.title}>ASV Dark Sky App</Text>
+        <Text style={styles.title}>ASV Dark Sky</Text>
         <Text style={styles.subtitle}>Sky Quality Meter</Text>
 
         <View style={styles.section}>
@@ -43,8 +43,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000ff",
   },
   container: {
-    padding: 20,
     alignItems: "center",
+    paddingHorizontal: 20,
+    marginHorizontal: 10,
+    paddingVertical: 40,
   },
   title: {
     color: "#ff0000ff",

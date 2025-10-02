@@ -146,6 +146,7 @@ export default function CameraScreen() {
       setDarkFrameUri(null);
       setDarkFrameBase64(null);
     }
+    setSQM(null);
     setViewMode("review");
   };
 
@@ -408,7 +409,7 @@ export default function CameraScreen() {
                 color: "#ff0000ff",
               }}
             >
-              Sky Quality Measure is {SQM.toFixed(2)}
+              Your SQM reading is {SQM.toFixed(2)}
             </Text>
           )
         )}
