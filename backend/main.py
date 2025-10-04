@@ -7,6 +7,7 @@ from datetime import datetime
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
+from moon_calculations import calculate_moon_phase, calculate_moon_impact, adjust_sqm_for_moon, get_moon_impact_description
 
 # Initialize Firebase Admin (only once)
 if not firebase_admin._apps:
@@ -123,13 +124,46 @@ def calculate_sky_brightness(request):
         instrumental_magnitude = -2.5 * np.log10(median_value / exposure_time_s)
         sky_quality_meter = instrumental_magnitude + zero_point
         
+        # Calculate moon phase and impact
+        measurement_timestamp = metadata.get('timestamp')
+        if measurement_timestamp:
+            try:
+                measurement_date = datetime.fromisoformat(measurement_timestamp.replace('Z', '+00:00'))
+            except:
+                measurement_date = datetime.utcnow()
+        else:
+            measurement_date = datetime.utcnow()
+        
+        moon_phase_data = calculate_moon_phase(measurement_date)
+        
+        # Get moon illumination from metadata if provided by frontend
+        moon_illumination = moon_phase_data['illumination']
+        moon_altitude = None
+        
+        if 'moon' in metadata:
+            moon_illumination = metadata['moon'].get('illumination', moon_illumination)
+            moon_altitude = metadata['moon'].get('altitude')
+        
+        # Calculate moon impact on sky brightness
+        moon_impact = calculate_moon_impact(moon_illumination, moon_altitude)
+        moon_adjusted_sqm = adjust_sqm_for_moon(sky_quality_meter, moon_impact)
+        moon_impact_desc = get_moon_impact_description(moon_impact)
+        
         # Save measurement to Firestore using the global db client
         measurement_data = {
             "median_sky_brightness_dn": float(median_value),
             "sky_quality_meter": float(sky_quality_meter),
+            "sky_quality_meter_moon_adjusted": float(moon_adjusted_sqm),
             "instrumental_magnitude": float(instrumental_magnitude),
             "zero_point": float(zero_point),
             "exposure_time_s": float(exposure_time_s),
+            "moon_data": {
+                "phase": moon_phase_data['phase'],
+                "illumination": moon_illumination,
+                "altitude": moon_altitude,
+                "impact_magnitude": float(moon_impact),
+                "impact_description": moon_impact_desc
+            },
             "image_dimensions": {
                 "height": int(light_frame.shape[0]),
                 "width": int(light_frame.shape[1]),
@@ -148,7 +182,15 @@ def calculate_sky_brightness(request):
         response = {
             "median_sky_brightness_dn": float(median_value),
             "sky_quality_meter": float(sky_quality_meter),
+            "sky_quality_meter_moon_adjusted": float(moon_adjusted_sqm),
             "instrumental_magnitude": float(instrumental_magnitude),
+            "moon_data": {
+                "phase": moon_phase_data['phase'],
+                "illumination": moon_illumination,
+                "altitude": moon_altitude,
+                "impact_magnitude": float(moon_impact),
+                "impact_description": moon_impact_desc
+            },
             "processing_info": {
                 "zero_point": float(zero_point),
                 "exposure_time_s": float(exposure_time_s),
