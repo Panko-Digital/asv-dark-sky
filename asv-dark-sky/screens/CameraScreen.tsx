@@ -13,6 +13,7 @@ import {
 import { Image } from "expo-image";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { saveMeasurement } from "../utils/storage";
+import MoonPhase from "../components/MoonPhase";
 
 export type ViewMode = "camera" | "review";
 
@@ -291,7 +292,7 @@ export default function CameraScreen() {
             </Text>
 
             {f.uri ? (
-              <View>
+              <View style={{ flexDirection: "row", position: "relative" }}>
                 <View style={[styles.dashedBorder, styles.previewFrame]}>
                   <Image
                     source={{ uri: f.uri }}
@@ -316,17 +317,12 @@ export default function CameraScreen() {
                     marginTop: 10,
                     paddingVertical: 0,
                     paddingHorizontal: 20,
+                    position: "absolute",
+                    right: -20,
+                    top: 0,
                   }}
                 >
-                  <Text
-                    style={{
-                      color: "#ff0000",
-                      textDecorationLine: "underline",
-                      textAlign: "center",
-                    }}
-                  >
-                    Clear
-                  </Text>
+                  <AntDesign name="delete" size={18} color="red" />
                 </Pressable>
               </View>
             ) : (
@@ -349,9 +345,6 @@ export default function CameraScreen() {
                     <AntDesign name="camera" size={24} color="red" />
                   </Text>
                 </Pressable>
-                <View style={{ marginTop: 10 }}>
-                  <Text>" "</Text>
-                </View>
               </View>
             )}
           </View>
@@ -425,6 +418,11 @@ export default function CameraScreen() {
             {error}
           </Text>
         )}
+
+        <MoonPhase
+          latitude={location?.coords.latitude}
+          longitude={location?.coords.longitude}
+        />
       </View>
     );
   };
@@ -512,23 +510,23 @@ const styles = StyleSheet.create({
   },
   reviewContainer: {
     flex: 1,
-    padding: 20,
+    paddingTop: 80,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
   },
   imageContainer: {
     alignItems: "center",
     marginBottom: 20,
   },
   previewImage: {
-    width: 192,
-    height: 192,
-    borderRadius: 96,
+    width: 148,
+    height: 148,
+    borderRadius: 74,
     aspectRatio: 1,
   },
   previewFrame: {
-    width: 200,
-    height: 200,
+    width: 150,
+    height: 150,
     borderRadius: 100,
     alignItems: "center",
     justifyContent: "center",
@@ -537,8 +535,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   emptyImage: {
-    width: 200,
-    height: 200,
+    width: 150,
+    height: 150,
     borderRadius: 100,
     alignItems: "center",
     justifyContent: "center",
