@@ -13,6 +13,14 @@ export interface SQMMeasurement {
     } | null;
     sqm: number;
     median_brightness: number;
+    moon_data?: {
+        phase: string;
+        illumination: number;
+        altitude: number | null;
+        impact_magnitude: number;
+        impact_description: string;
+    };
+    sqm_moon_adjusted?: number;
 }
 
 /**
@@ -21,7 +29,9 @@ export interface SQMMeasurement {
 export const saveMeasurement = async (
     location: SQMMeasurement['location'],
     sqm: number,
-    median_brightness: number
+    median_brightness: number,
+    moon_data?: SQMMeasurement['moon_data'],
+    sqm_moon_adjusted?: number
 ): Promise<void> => {
     try {
         // Load existing history
@@ -34,6 +44,8 @@ export const saveMeasurement = async (
             location,
             sqm,
             median_brightness,
+            moon_data,
+            sqm_moon_adjusted,
         };
 
         // Add to beginning of array (most recent first)

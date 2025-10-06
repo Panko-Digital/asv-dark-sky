@@ -20,6 +20,7 @@ import {
 export default function HistoryScreen() {
   const [history, setHistory] = useState<SQMMeasurement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchHistory = async () => {
     try {
@@ -104,32 +105,168 @@ export default function HistoryScreen() {
     return `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`;
   };
 
-  const renderItem = ({ item }: { item: SQMMeasurement }) => (
-    <View style={styles.row}>
-      <View style={styles.cell}>
-        <Text style={styles.cellValue} numberOfLines={2}>
-          {formatDate(item.timestamp)}
-        </Text>
+  const toggleExpand = (id: string) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
+  const renderItem = ({ item }: { item: SQMMeasurement }) => {
+    const isExpanded = expandedId === item.id;
+
+    return (
+      <View>
+        <Pressable
+          onPress={() => toggleExpand(item.id)}
+          style={({ pressed }) => [
+            styles.row,
+            pressed && { backgroundColor: "#1a0000" },
+          ]}
+        >
+          <View style={styles.cell}>
+            <Text style={styles.cellValue} numberOfLines={1}>
+              {formatDate(item.timestamp)}
+            </Text>
+          </View>
+          <View style={styles.cellSqm}>
+            <Text style={styles.sqmValue}>{item.sqm.toFixed(2)}</Text>
+          </View>
+          <View style={styles.cellLocation}>
+            <Text style={styles.cellValueSmall} numberOfLines={1}>
+              {formatLocation(item.location)}
+            </Text>
+          </View>
+          <View style={styles.expandIndicator}>
+            <Text style={styles.expandIcon}>{isExpanded ? "▼" : "▶"}</Text>
+          </View>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              handleDeleteItem(item.id);
+            }}
+            style={({ pressed }) => [
+              styles.deleteButton,
+              pressed && { opacity: 0.5 },
+            ]}
+          >
+            <Text style={styles.deleteButtonText}>&times;</Text>
+          </Pressable>
+        </Pressable>
+
+        {isExpanded && (
+          <View style={styles.expandedPanel}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Date & Time:</Text>
+              <Text style={styles.detailValue}>
+                {new Date(item.timestamp).toLocaleString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>SQM Reading:</Text>
+              <Text style={[styles.detailValue, styles.detailValueLarge]}>
+                {item.sqm.toFixed(2)} mag/arcsec²
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Sky Brightness:</Text>
+              <Text style={styles.detailValue}>
+                {item.median_brightness.toFixed(2)} DN
+              </Text>
+            </View>
+
+            {item.sqm_moon_adjusted && (
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>SQM (Moon Adjusted):</Text>
+                <Text style={styles.detailValue}>
+                  {item.sqm_moon_adjusted.toFixed(2)} mag/arcsec²
+                </Text>
+              </View>
+            )}
+
+            {item.moon_data && (
+              <>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Moon Phase:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.moon_data.phase} (
+                    {item.moon_data.illumination.toFixed(1)}%)
+                  </Text>
+                </View>
+
+                {item.moon_data.altitude !== null && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Moon Altitude:</Text>
+                    <Text style={styles.detailValue}>
+                      {item.moon_data.altitude.toFixed(1)}°
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Moon Impact:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.moon_data.impact_description} (
+                    {item.moon_data.impact_magnitude.toFixed(2)} mag)
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {item.location && (
+              <>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Latitude:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.location.latitude.toFixed(6)}°
+                  </Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Longitude:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.location.longitude.toFixed(6)}°
+                  </Text>
+                </View>
+
+                {item.location.altitude !== null && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Altitude:</Text>
+                    <Text style={styles.detailValue}>
+                      {item.location.altitude.toFixed(1)}m
+                    </Text>
+                  </View>
+                )}
+
+                {item.location.accuracy !== null && (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>GPS Accuracy:</Text>
+                    <Text style={styles.detailValue}>
+                      ±{item.location.accuracy.toFixed(1)}m
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>ID:</Text>
+              <Text style={[styles.detailValue, styles.detailValueSmall]}>
+                {item.id}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
-      <View style={styles.cellSqm}>
-        <Text style={styles.sqmValue}>{item.sqm.toFixed(2)}</Text>
-      </View>
-      <View style={styles.cellLocation}>
-        <Text style={styles.cellValueSmall} numberOfLines={1}>
-          {formatLocation(item.location)}
-        </Text>
-      </View>
-      <Pressable
-        onPress={() => handleDeleteItem(item.id)}
-        style={({ pressed }) => [
-          styles.deleteButton,
-          pressed && { opacity: 0.5 },
-        ]}
-      >
-        <Text style={styles.deleteButtonText}>&times;</Text>
-      </Pressable>
-    </View>
-  );
+    );
+  };
 
   const renderEmpty = () => (
     <View style={styles.emptyStateContainer}>
@@ -251,7 +388,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#ff0000",
   },
   headerCell: {
-    flex: 2,
+    flex: 3,
     paddingRight: 8,
   },
   headerCellSqm: {
@@ -344,7 +481,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cell: {
-    flex: 2,
+    flex: 3,
     paddingRight: 8,
   },
   cellSqm: {
@@ -389,5 +526,54 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     position: "relative",
     top: -4,
+  },
+  expandIndicator: {
+    width: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  expandIcon: {
+    color: "#ff0000",
+    fontSize: 12,
+  },
+  expandedPanel: {
+    backgroundColor: "#0a0000",
+    borderTopWidth: 1,
+    borderTopColor: "#ff0000",
+    borderBottomWidth: 2,
+    borderBottomColor: "#ff0000",
+    paddingVertical: 15,
+    paddingHorizontal: 15,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 6,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: "#ff0000",
+    opacity: 0.7,
+    fontWeight: "600",
+    flex: 1,
+  },
+  detailValue: {
+    fontSize: 12,
+    color: "#ff0000",
+    flex: 2,
+    textAlign: "right",
+  },
+  detailValueLarge: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  detailValueSmall: {
+    fontSize: 10,
+    opacity: 0.8,
   },
 });

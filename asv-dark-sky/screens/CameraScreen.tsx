@@ -20,6 +20,14 @@ export type ViewMode = "camera" | "review";
 export type responseFormat = {
   median_sky_brightness_dn: number;
   sky_quality_meter: number;
+  sky_quality_meter_moon_adjusted?: number;
+  moon_data?: {
+    phase: string;
+    illumination: number;
+    altitude: number | null;
+    impact_magnitude: number;
+    impact_description: string;
+  };
 };
 
 export type errorResponseFormat = {
@@ -265,7 +273,9 @@ export default function CameraScreen() {
           await saveMeasurement(
             locationData,
             data.sky_quality_meter,
-            data.median_sky_brightness_dn
+            data.median_sky_brightness_dn,
+            data.moon_data,
+            data.sky_quality_meter_moon_adjusted
           );
           console.log("Measurement saved to history");
         } catch (saveError) {
