@@ -211,16 +211,16 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
 const styles = StyleSheet.create({
   moonPhaseContainer: {
     position: "absolute",
-    bottom: 20,
-    left: 0,
-    right: 0,
+    bottom: 0,
     alignItems: "center",
     padding: 12,
-    backgroundColor: "rgba(0, 0, 0, 0.85)",
-    marginHorizontal: 20,
-    borderRadius: 12,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
     borderColor: "#ff0000",
-    borderWidth: 1,
+    borderWidth: 0,
+    backgroundColor: "#222",
+    width: "90%",
+    marginHorizontal: "auto",
   },
   mainInfo: {
     flexDirection: "row",
