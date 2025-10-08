@@ -210,17 +210,14 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
 
 const styles = StyleSheet.create({
   moonPhaseContainer: {
-    position: "absolute",
-    bottom: 0,
     alignItems: "center",
-    padding: 12,
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
+    padding: 20,
+    borderRadius: 12,
     borderColor: "#ff0000",
-    borderWidth: 0,
-    backgroundColor: "#222",
-    width: "90%",
-    marginHorizontal: "auto",
+    borderWidth: 2,
+    backgroundColor: "#1a0000",
+    width: "100%",
+    marginBottom: 20,
   },
   mainInfo: {
     flexDirection: "row",
@@ -229,33 +226,33 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   moonPhaseEmoji: {
-    fontSize: 40,
-    marginRight: 12,
+    fontSize: 50,
+    marginRight: 16,
   },
   textContainer: {
     flex: 1,
   },
   moonPhaseText: {
-    color: "#ffffff",
-    fontSize: 14,
+    color: "#ff0000",
+    fontSize: 16,
     fontWeight: "600",
-    marginBottom: 3,
+    marginBottom: 4,
   },
   moonAltitudeText: {
-    color: "#bfbfbf",
-    fontSize: 12,
-    marginBottom: 2,
+    color: "#ff0000",
+    fontSize: 14,
+    marginBottom: 3,
+    opacity: 0.8,
   },
   moonImpactText: {
     color: "#ff6b6b",
-    fontSize: 11,
+    fontSize: 13,
     fontStyle: "italic",
-    marginBottom: -10,
   },
   altitudeArc: {
     width: "100%",
     height: 80,
-    marginTop: 4,
+    marginTop: 8,
     alignItems: "center",
   },
 });

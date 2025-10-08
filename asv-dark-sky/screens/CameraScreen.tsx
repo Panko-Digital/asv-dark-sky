@@ -13,7 +13,6 @@ import {
 import { Image } from "expo-image";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { saveMeasurement } from "../utils/storage";
-import MoonPhase from "../components/MoonPhase";
 
 export type ViewMode = "camera" | "review";
 
@@ -165,6 +164,9 @@ export default function CameraScreen() {
         quality: 0.8,
         base64: true,
         exif: false,
+        skipProcessing: true,
+        // Explicitly disable shutter sound and preview animation
+        isImageMirror: false,
       });
 
       if (!photo || !photo.uri || !photo.base64) {
@@ -439,11 +441,6 @@ export default function CameraScreen() {
             {error}
           </Text>
         )}
-
-        <MoonPhase
-          latitude={location?.coords.latitude}
-          longitude={location?.coords.longitude}
-        />
       </View>
     );
   };
@@ -459,6 +456,7 @@ export default function CameraScreen() {
           responsiveOrientationWhenOrientationLocked
           flash="off"
           enableTorch={false}
+          animateShutter={false}
         />
         <View style={styles.shutterContainer}>
           <Pressable onPress={takePicture}>

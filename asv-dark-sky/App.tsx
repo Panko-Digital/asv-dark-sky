@@ -8,6 +8,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import CameraScreen from "./screens/CameraScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import InfoScreen from "./screens/InfoScreen";
+import MoonScreen from "./screens/MoonScreen";
 
 // Conditionally import MapScreen only on native platforms
 const MapScreen =
@@ -68,6 +69,16 @@ export default function App() {
             headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <MaterialIcons name="history" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Moon"
+          component={MoonScreen}
+          options={{
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="moon" size={size} color={color} />
             ),
           }}
         />
