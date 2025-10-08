@@ -250,11 +250,12 @@ const styles = StyleSheet.create({
     color: "#ff6b6b",
     fontSize: 11,
     fontStyle: "italic",
+    marginBottom: -10,
   },
   altitudeArc: {
     width: "100%",
     height: 80,
-    marginTop: 12,
+    marginTop: 4,
     alignItems: "center",
   },
 });

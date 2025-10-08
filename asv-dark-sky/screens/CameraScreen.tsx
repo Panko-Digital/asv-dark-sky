@@ -365,6 +365,7 @@ export default function CameraScreen() {
             onPress={() => {
               sendToServer();
             }}
+            disabled={!(lightFrameBase64 && darkFrameBase64)}
             style={({ pressed }) => [
               {
                 backgroundColor: "#000000",
@@ -377,15 +378,18 @@ export default function CameraScreen() {
               },
               pressed && { opacity: 0.6 },
               !(lightFrameBase64 && darkFrameBase64) && {
-                opacity: 0,
+                opacity: 0.75,
                 pointerEvents: "none",
+                borderWidth: 0,
               },
             ]}
           >
             <Text
               style={{ color: "#ff0000", fontSize: 16, fontWeight: "bold" }}
             >
-              Check Sky Quality
+              {!(lightFrameBase64 && darkFrameBase64)
+                ? "Take Sky & Dark Photos"
+                : "Check Sky Quality"}
             </Text>
           </Pressable>
         )}
@@ -400,21 +404,28 @@ export default function CameraScreen() {
           >
             <ActivityIndicator size="large" color="red" />
           </View>
+        ) : SQM && lightFrameBase64 && darkFrameBase64 ? (
+          <Text
+            style={{
+              textAlign: "center",
+              marginTop: 6,
+              fontSize: 18,
+              color: "#bbbbbb",
+            }}
+          >
+            Your SQM reading is {SQM.toFixed(2)}
+          </Text>
         ) : (
-          SQM &&
-          lightFrameBase64 &&
-          darkFrameBase64 && (
-            <Text
-              style={{
-                textAlign: "center",
-                marginTop: 20,
-                fontSize: 18,
-                color: "#ff0000ff",
-              }}
-            >
-              Your SQM reading is {SQM.toFixed(2)}
-            </Text>
-          )
+          <Text
+            style={{
+              textAlign: "center",
+              marginTop: 6,
+              fontSize: 16,
+              color: "#bbbbbb",
+            }}
+          >
+            No SQM reading yet
+          </Text>
         )}
         {error && (
           <Text
@@ -526,7 +537,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 12,
   },
   previewImage: {
     width: 148,
