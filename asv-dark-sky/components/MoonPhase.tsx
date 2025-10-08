@@ -28,12 +28,17 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
   const getInitialMoonPhase = (): MoonPhaseData => {
     const now = new Date();
     const phaseData = calculateMoonPhase(now);
-    
+
     let altitude: number | undefined;
     // Use provided props or existing location if available
-    const currentLoc = latitude && longitude ? { latitude, longitude } : location;
+    const currentLoc =
+      latitude && longitude ? { latitude, longitude } : location;
     if (currentLoc) {
-      altitude = estimateMoonAltitude(now, currentLoc.latitude, currentLoc.longitude);
+      altitude = estimateMoonAltitude(
+        now,
+        currentLoc.latitude,
+        currentLoc.longitude
+      );
     }
 
     return {
@@ -44,7 +49,9 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
     };
   };
 
-  const [moonPhase, setMoonPhase] = useState<MoonPhaseData>(getInitialMoonPhase());
+  const [moonPhase, setMoonPhase] = useState<MoonPhaseData>(
+    getInitialMoonPhase()
+  );
 
   const getPhaseEmoji = (phase: string): string => {
     const emojiMap: { [key: string]: string } = {
