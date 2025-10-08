@@ -19,11 +19,32 @@ interface MoonPhaseProps {
 }
 
 export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
-  const [moonPhase, setMoonPhase] = useState<MoonPhaseData | null>(null);
   const [location, setLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(latitude && longitude ? { latitude, longitude } : null);
+
+  // Initialize moon phase data immediately on mount (without altitude)
+  const getInitialMoonPhase = (): MoonPhaseData => {
+    const now = new Date();
+    const phaseData = calculateMoonPhase(now);
+    
+    let altitude: number | undefined;
+    // Use provided props or existing location if available
+    const currentLoc = latitude && longitude ? { latitude, longitude } : location;
+    if (currentLoc) {
+      altitude = estimateMoonAltitude(now, currentLoc.latitude, currentLoc.longitude);
+    }
+
+    return {
+      phase: phaseData.phase,
+      illumination: phaseData.illumination,
+      altitude,
+      emoji: getPhaseEmoji(phaseData.phase),
+    };
+  };
+
+  const [moonPhase, setMoonPhase] = useState<MoonPhaseData>(getInitialMoonPhase());
 
   const getPhaseEmoji = (phase: string): string => {
     const emojiMap: { [key: string]: string } = {
@@ -85,6 +106,7 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
       setMoonPhase(moonData);
     };
 
+    // Update immediately on mount and whenever location changes
     updateMoonPhase();
 
     // Update every 10 minutes
@@ -92,10 +114,6 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
 
     return () => clearInterval(interval);
   }, [location]);
-
-  if (!moonPhase) {
-    return null;
-  }
 
   const impactDescription = getMoonImpactDescription(moonPhase);
   const isAboveHorizon =
