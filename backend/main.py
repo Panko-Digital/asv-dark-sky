@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import json
 import base64
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -128,11 +128,16 @@ def calculate_sky_brightness(request):
         measurement_timestamp = metadata.get('timestamp')
         if measurement_timestamp:
             try:
+                # Parse ISO format timestamp (handles both Z and +00:00)
                 measurement_date = datetime.fromisoformat(measurement_timestamp.replace('Z', '+00:00'))
-            except:
-                measurement_date = datetime.utcnow()
+                # Ensure timezone-aware (should already be from fromisoformat)
+                if measurement_date.tzinfo is None:
+                    measurement_date = measurement_date.replace(tzinfo=timezone.utc)
+            except Exception as e:
+                print(f"Error parsing timestamp: {e}")
+                measurement_date = datetime.now(timezone.utc)
         else:
-            measurement_date = datetime.utcnow()
+            measurement_date = datetime.now(timezone.utc)
         
         moon_phase_data = calculate_moon_phase(measurement_date)
         
@@ -171,7 +176,7 @@ def calculate_sky_brightness(request):
             },
             "metadata": metadata,
             "timestamp": firestore.SERVER_TIMESTAMP,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         # Add to 'measurements' collection

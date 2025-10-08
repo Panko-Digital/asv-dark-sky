@@ -3,7 +3,7 @@ Moon brightness calculations for sky quality measurements
 """
 
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 
@@ -15,8 +15,12 @@ def calculate_moon_phase(date: datetime) -> Dict[str, any]:
         dict with 'phase' (str) and 'illumination' (int, 0-100)
     """
     # Known new moon: January 6, 2000, 18:14 UTC
-    known_new_moon = datetime(2000, 1, 6, 18, 14)
+    known_new_moon = datetime(2000, 1, 6, 18, 14, tzinfo=timezone.utc)
     lunar_cycle = 29.53058867  # days
+    
+    # Ensure date is timezone-aware (convert to UTC if naive)
+    if date.tzinfo is None:
+        date = date.replace(tzinfo=timezone.utc)
     
     time_diff = date - known_new_moon
     days_since_new_moon = time_diff.total_seconds() / (60 * 60 * 24)
