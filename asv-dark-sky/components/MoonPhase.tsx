@@ -24,6 +24,20 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
     longitude: number;
   } | null>(latitude && longitude ? { latitude, longitude } : null);
 
+  const getPhaseEmoji = (phase: string): string => {
+    const emojiMap: { [key: string]: string } = {
+      "New Moon": "🌑",
+      "Waxing Crescent": "🌒",
+      "First Quarter": "🌓",
+      "Waxing Gibbous": "🌔",
+      "Full Moon": "🌕",
+      "Waning Gibbous": "🌖",
+      "Last Quarter": "🌗",
+      "Waning Crescent": "🌘",
+    };
+    return emojiMap[phase] || "🌕";
+  };
+
   // Initialize moon phase data immediately on mount (without altitude)
   const getInitialMoonPhase = (): MoonPhaseData => {
     const now = new Date();
@@ -52,20 +66,6 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
   const [moonPhase, setMoonPhase] = useState<MoonPhaseData>(
     getInitialMoonPhase()
   );
-
-  const getPhaseEmoji = (phase: string): string => {
-    const emojiMap: { [key: string]: string } = {
-      "New Moon": "🌑",
-      "Waxing Crescent": "🌒",
-      "First Quarter": "🌓",
-      "Waxing Gibbous": "🌔",
-      "Full Moon": "🌕",
-      "Waning Gibbous": "🌖",
-      "Last Quarter": "🌗",
-      "Waning Crescent": "🌘",
-    };
-    return emojiMap[phase] || "🌕";
-  };
 
   useEffect(() => {
     // Get location if not provided
