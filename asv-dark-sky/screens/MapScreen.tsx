@@ -134,6 +134,10 @@ export default function MapScreen() {
     latitudeDelta: 0.5,
     longitudeDelta: 0.5,
   });
+  const [currentZoom, setCurrentZoom] = useState({
+    latitudeDelta: 0.5,
+    longitudeDelta: 0.5,
+  });
 
   const fetchMeasurements = async () => {
     try {
@@ -176,6 +180,77 @@ export default function MapScreen() {
     }, [])
   );
 
+  // Calculate distance between two coordinates in kilometers
+  const getDistance = (
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+  ): number => {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Calculate minimum distance threshold based on zoom level
+  const getMinDistance = (latitudeDelta: number): number => {
+    // More zoomed in = smaller latitudeDelta = smaller minimum distance
+    // Adjust these values to tune the clustering behavior
+    if (latitudeDelta > 1) return 5; // Very zoomed out: 5km spacing
+    if (latitudeDelta > 0.5) return 2; // Zoomed out: 2km spacing
+    if (latitudeDelta > 0.1) return 0.5; // Medium zoom: 500m spacing
+    if (latitudeDelta > 0.05) return 0.2; // Zoomed in: 200m spacing
+    return 0.05; // Very zoomed in: 50m spacing (show all)
+  };
+
+  // Filter markers to prevent overlapping based on current zoom
+  const getVisibleMarkers = (): Measurement[] => {
+    const minDistance = getMinDistance(currentZoom.latitudeDelta);
+    const visible: Measurement[] = [];
+
+    // Sort by SQM (show better quality readings preferentially)
+    const sorted = [...measurements].sort(
+      (a, b) => b.sky_quality_meter - a.sky_quality_meter
+    );
+
+    for (const measurement of sorted) {
+      if (!measurement.location) continue;
+
+      // Check if this marker is too close to any already visible marker
+      const tooClose = visible.some((visibleMarker) => {
+        if (!visibleMarker.location) return false;
+        const distance = getDistance(
+          measurement.location!.latitude,
+          measurement.location!.longitude,
+          visibleMarker.location.latitude,
+          visibleMarker.location.longitude
+        );
+        return distance < minDistance;
+      });
+
+      if (!tooClose) {
+        visible.push(measurement);
+      }
+    }
+
+    return visible;
+  };
+
+  const handleRegionChangeComplete = (newRegion: typeof region) => {
+    setCurrentZoom({
+      latitudeDelta: newRegion.latitudeDelta,
+      longitudeDelta: newRegion.longitudeDelta,
+    });
+  };
+
   const getMarkerColor = (sqm: number) => {
     // Color code based on SQM value
     // Darker skies (higher SQM) = better = green
@@ -205,8 +280,9 @@ export default function MapScreen() {
         initialRegion={region}
         showsUserLocation={true}
         showsMyLocationButton={true}
+        onRegionChangeComplete={handleRegionChangeComplete}
       >
-        {measurements.map((measurement) => {
+        {getVisibleMarkers().map((measurement) => {
           if (!measurement.location) return null;
 
           const sqm = measurement.sky_quality_meter;

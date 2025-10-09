@@ -83,6 +83,7 @@ export default function CameraScreen() {
   const [mode, setMode] = useState<CameraMode>("picture");
   const [frame, setFrame] = useState<"light" | "dark">("light");
   const [viewMode, setViewMode] = useState<ViewMode>("review");
+  const [activeTab, setActiveTab] = useState<"light" | "dark">("light"); // For switching between photo views
   const [SQM, setSQM] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -146,8 +147,8 @@ export default function CameraScreen() {
     );
   }
 
-  const reset = (label: string) => {
-    if (label === "Sky Photo") {
+  const reset = (type: "light" | "dark") => {
+    if (type === "light") {
       setLightFrameUri(null);
       setLightFrameBase64(null);
     } else {
@@ -155,7 +156,7 @@ export default function CameraScreen() {
       setDarkFrameBase64(null);
     }
     setSQM(null);
-    setViewMode("review");
+    setError(null);
   };
 
   const takePicture = async () => {
@@ -194,6 +195,8 @@ export default function CameraScreen() {
       if (frame === "light") {
         setLightFrameUri(photo.uri);
         setLightFrameBase64(sanitized.dataUri);
+        // After taking sky photo, switch to dark photo tab
+        setActiveTab("dark");
       } else {
         setDarkFrameUri(photo.uri);
         setDarkFrameBase64(sanitized.dataUri);
@@ -289,165 +292,144 @@ export default function CameraScreen() {
   };
 
   const renderPictures = () => {
-    const frames = [
-      { uri: lightFrameUri, label: "Sky Photo" },
-      { uri: darkFrameUri, label: "Dark Photo" },
-    ];
+    // Determine which photo to show based on workflow
+    const currentPhoto =
+      activeTab === "light"
+        ? { uri: lightFrameUri, label: "Sky Photo", type: "light" as const }
+        : {
+            uri: darkFrameUri,
+            label: "Dark Photo",
+            type: "dark" as const,
+          };
+
+    const bothPhotosTaken = lightFrameUri && darkFrameUri;
 
     return (
       <View style={styles.reviewContainer}>
-        {frames.map((f) => (
-          <View key={f.label} style={styles.imageContainer}>
-            <Text style={styles.imageLabel}>
-              {f.label}
-              {f.label !== "Sky Photo" && " (Shield camera lenses)"}
-            </Text>
-
-            {f.uri ? (
-              <View style={{ flexDirection: "row", position: "relative" }}>
-                <View style={[styles.dashedBorder, styles.previewFrame]}>
-                  <Image
-                    source={{ uri: f.uri }}
-                    contentFit="cover"
-                    style={styles.previewImage}
-                    onError={() => {
-                      Alert.alert(
-                        "Image Error",
-                        `Failed to load image: ${f.uri}`
-                      );
-                    }}
-                    onLoad={() => {
-                      console.log(`Image loaded successfully: ${f.uri}`);
-                    }}
-                  />
-                </View>
-                <Pressable
-                  onPress={() => {
-                    reset(f.label);
-                  }}
-                  style={{
-                    marginTop: 10,
-                    paddingVertical: 0,
-                    paddingHorizontal: 20,
-                    position: "absolute",
-                    right: -20,
-                    top: 0,
-                  }}
-                >
-                  <AntDesign name="delete" size={18} color="red" />
-                </Pressable>
-              </View>
-            ) : (
-              <View>
-                <Pressable
-                  onPress={() => {
-                    setMode("picture");
-                    setFrame(f.label === "Sky Photo" ? "light" : "dark");
-                    setViewMode("camera");
-                  }}
-                  style={[styles.emptyImage, styles.dashedBorder]}
-                >
-                  <Text
-                    style={{
-                      color: "#ff0000",
-                      fontSize: 20,
-                      textAlign: "center",
-                    }}
-                  >
-                    <AntDesign name="camera" size={24} color="red" />
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-          </View>
-        ))}
-
-        {!loading && (
-          <Pressable
-            onPress={() => {
-              sendToServer();
-            }}
-            disabled={!(lightFrameBase64 && darkFrameBase64)}
-            style={({ pressed }) => [
-              {
-                backgroundColor: "#000000",
-                borderWidth: 2,
-                borderRadius: 8,
-                borderColor: "#ff0000",
-                paddingVertical: 12,
-                paddingHorizontal: 20,
-                alignItems: "center",
-              },
-              pressed && { opacity: 0.6 },
-              !(lightFrameBase64 && darkFrameBase64) && {
-                opacity: 0.75,
-                pointerEvents: "none",
-                borderWidth: 0,
-              },
-            ]}
-          >
-            <Text
-              style={{ color: "#ff0000", fontSize: 16, fontWeight: "bold" }}
+        {/* Tab navigation - only show if both photos are taken */}
+        {bothPhotosTaken && (
+          <View style={styles.tabContainer}>
+            <Pressable
+              onPress={() => setActiveTab("light")}
+              style={[styles.tab, activeTab === "light" && styles.tabActive]}
             >
-              {!(lightFrameBase64 && darkFrameBase64)
-                ? "Take Sky & Dark Photos"
-                : "Check Sky Quality"}
-            </Text>
-          </Pressable>
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === "light" && styles.tabTextActive,
+                ]}
+              >
+                Sky Photo
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setActiveTab("dark")}
+              style={[styles.tab, activeTab === "dark" && styles.tabActive]}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === "dark" && styles.tabTextActive,
+                ]}
+              >
+                Dark Photo
+              </Text>
+            </Pressable>
+          </View>
         )}
 
-        {loading ? (
-          <View
-            style={{
-              marginTop: 20,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <ActivityIndicator size="large" color="red" />
-          </View>
-        ) : SQM && lightFrameBase64 && darkFrameBase64 ? (
-          <Text
-            style={{
-              textAlign: "center",
-              marginTop: 6,
-              fontSize: 18,
-              color: "#bbbbbb",
-            }}
-          >
-            Your SQM reading is {SQM.toFixed(2)}
-          </Text>
-        ) : (
-          <Text
-            style={{
-              textAlign: "center",
-              marginTop: 6,
-              fontSize: 16,
-              color: "#bbbbbb",
-            }}
-          >
-            No SQM reading yet
-          </Text>
-        )}
-        {error && (
-          <Text
-            style={{
-              textAlign: "center",
-              marginTop: 20,
-              fontSize: 18,
-              color: "#ff0000ff",
-            }}
-          >
-            {error}
-          </Text>
-        )}
+        {/* Photo preview or capture prompt */}
+        <View style={styles.photoSection}>
+          <Text style={styles.photoLabel}>{currentPhoto.label}</Text>
+
+          {currentPhoto.uri ? (
+            <View style={styles.photoContainer}>
+              <Image
+                source={{ uri: currentPhoto.uri }}
+                contentFit="contain"
+                style={styles.photoImage}
+                onError={() => {
+                  Alert.alert(
+                    "Image Error",
+                    `Failed to load ${currentPhoto.label}`
+                  );
+                }}
+              />
+              <Pressable
+                onPress={() => reset(currentPhoto.type)}
+                style={styles.deleteButton}
+              >
+                <AntDesign name="delete" size={24} color="#ff0000" />
+                <Text style={styles.deleteText}>Retake</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                setMode("picture");
+                setFrame(currentPhoto.type);
+                setViewMode("camera");
+              }}
+              style={styles.capturePrompt}
+            >
+              <AntDesign name="camera" size={64} color="#ff0000" />
+              <Text style={styles.capturePromptText}>
+                Tap to capture {currentPhoto.label.toLowerCase()}
+              </Text>
+              {currentPhoto.type === "dark" && (
+                <Text style={styles.captureHint}>
+                  (Cover lenses and block out all light)
+                </Text>
+              )}
+            </Pressable>
+          )}
+        </View>
+
+        {/* Action button and results */}
+        <View style={styles.actionSection}>
+          {!bothPhotosTaken && (
+            <Text style={styles.instructionText}>
+              {!lightFrameUri
+                ? "Step 1: Take a sky photo"
+                : "Step 2: Take a dark photo"}
+            </Text>
+          )}
+
+          {bothPhotosTaken && !loading && (
+            <Pressable
+              onPress={sendToServer}
+              style={({ pressed }) => [
+                styles.actionButton,
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Text style={styles.actionButtonText}>Check Sky Quality</Text>
+            </Pressable>
+          )}
+
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#ff0000" />
+              <Text style={styles.loadingText}>Analyzing...</Text>
+            </View>
+          )}
+
+          {SQM && bothPhotosTaken && (
+            <View style={styles.resultContainer}>
+              <Text style={styles.resultLabel}>SQM Reading</Text>
+              <Text style={styles.resultValue}>{SQM.toFixed(2)}</Text>
+            </View>
+          )}
+
+          {error && <Text style={styles.errorText}>{error}</Text>}
+        </View>
       </View>
     );
   };
 
   const renderCamera = () => {
     return (
-      <View style={styles.cameraContainer}>
+      <>
         <CameraView
           style={styles.camera}
           ref={ref}
@@ -481,13 +463,28 @@ export default function CameraScreen() {
             )}
           </Pressable>
         </View>
-      </View>
+      </>
     );
   };
 
   return (
     <View style={styles.container}>
-      {viewMode === "review" ? renderPictures() : renderCamera()}
+      <View
+        style={[
+          styles.cameraContainer,
+          viewMode === "review" && { display: "none" },
+        ]}
+      >
+        {renderCamera()}
+      </View>
+      <View
+        style={[
+          styles.reviewContainer,
+          viewMode === "camera" && { display: "none" },
+        ]}
+      >
+        {renderPictures()}
+      </View>
     </View>
   );
 }
@@ -495,12 +492,12 @@ export default function CameraScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000ff",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#2a2a2a",
     color: "#ff0000ff",
   },
-  cameraContainer: StyleSheet.absoluteFillObject,
+  cameraContainer: {
+    ...StyleSheet.absoluteFillObject,
+  },
   camera: StyleSheet.absoluteFillObject,
   shutterContainer: {
     position: "absolute",
@@ -528,61 +525,158 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   reviewContainer: {
-    flex: 1,
-    paddingTop: 80,
-    alignItems: "center",
-    justifyContent: "flex-start",
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#2a2a2a",
+    paddingTop: 60,
   },
-  imageContainer: {
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  previewImage: {
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    aspectRatio: 1,
-  },
-  previewFrame: {
-    width: 150,
-    height: 150,
-    borderRadius: 100,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: "#1a1a1a",
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 8,
     padding: 4,
-    borderWidth: 2,
   },
-  emptyImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 100,
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderRadius: 6,
+  },
+  tabActive: {
+    backgroundColor: "#ff0000",
+  },
+  tabText: {
+    color: "#888888",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  tabTextActive: {
+    color: "#ffffff",
+  },
+  photoSection: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 10,
+    paddingHorizontal: 20,
   },
-  dashedBorder: {
-    borderStyle: "dashed",
+  photoLabel: {
+    color: "#ff0000",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  photoContainer: {
+    width: "100%",
+    aspectRatio: 4 / 3,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    overflow: "hidden",
     borderWidth: 2,
     borderColor: "#ff0000",
-    backgroundColor: "#000000",
+    position: "relative",
   },
-  imageLabel: {
+  photoImage: {
+    width: "100%",
+    height: "100%",
+  },
+  deleteButton: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  deleteText: {
+    color: "#ff0000",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  capturePrompt: {
+    width: "100%",
+    aspectRatio: 4 / 3,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#ff0000",
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  capturePromptText: {
+    color: "#ff0000",
+    fontSize: 18,
+    fontWeight: "600",
     textAlign: "center",
-    marginTop: 0,
+  },
+  captureHint: {
+    color: "#888888",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 4,
+  },
+  actionSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    alignItems: "center",
+    gap: 12,
+  },
+  instructionText: {
+    color: "#bbbbbb",
     fontSize: 16,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  actionButton: {
+    backgroundColor: "#ff0000",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
+  },
+  actionButtonText: {
+    color: "#ffffff",
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#ff0000ff",
   },
-  shieldLabel: {
-    textAlign: "center",
+  loadingContainer: {
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    color: "#ff0000",
     fontSize: 16,
-    color: "#ff0000ff",
   },
-  debugText: {
+  resultContainer: {
+    backgroundColor: "#1a1a1a",
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#ff0000",
+    alignItems: "center",
+    width: "100%",
+  },
+  resultLabel: {
+    color: "#bbbbbb",
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  resultValue: {
+    color: "#ff0000",
+    fontSize: 36,
+    fontWeight: "bold",
+  },
+  errorText: {
+    color: "#ff0000",
+    fontSize: 16,
     textAlign: "center",
-    marginTop: 5,
-    fontSize: 12,
-    color: "#ff0000ff",
   },
 });
