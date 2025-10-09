@@ -6,11 +6,11 @@ module.exports = ({ config }) => {
         ios: {
             ...config.ios,
             config: {
-                googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY,
+                googleMapsApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
             },
             infoPlist: {
                 ...config.ios?.infoPlist,
-                GoogleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_IOS_API_KEY,
+                GoogleMapsApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
             },
         },
         android: {
@@ -18,7 +18,7 @@ module.exports = ({ config }) => {
             config: {
                 ...(config.android?.config || {}),
                 googleMaps: {
-                    apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_API_KEY,
+                    apiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
                 },
             },
         },

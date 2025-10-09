@@ -6,7 +6,11 @@ const appConfigModule = require('./app.config.js');
 
 const finalConfig = appConfigModule({ config: appJson.expo });
 
-console.log('=== FINAL ANDROID CONFIG ===');
+console.log('=== ENVIRONMENT VARIABLES ===');
+console.log('GOOGLE_MAPS_ANDROID_API_KEY:', process.env.GOOGLE_MAPS_ANDROID_API_KEY);
+console.log('GOOGLE_MAPS_IOS_API_KEY:', process.env.GOOGLE_MAPS_IOS_API_KEY);
+
+console.log('\n=== FINAL ANDROID CONFIG ===');
 console.log(JSON.stringify(finalConfig.android, null, 2));
 
 console.log('\n=== GOOGLE MAPS API KEY ===');

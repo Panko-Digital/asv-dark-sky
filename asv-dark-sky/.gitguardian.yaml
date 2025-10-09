@@ -1,0 +1,47 @@
+version: 2
+
+# Paths to ignore during scanning
+paths-ignore:
+  - "node_modules/**"
+  - ".expo/**"
+  - ".expo-shared/**"
+  - "android/build/**"
+  - "ios/build/**"
+  - "ios/Pods/**"
+  - "**/test-config.js"  # Our test script
+  - "**/*.lock"
+  - "**/*.log"
+
+# Patterns to ignore (placeholders, examples, etc.)
+matches-ignore:
+  - name: Placeholder API keys in documentation
+    match: YOUR_.*_API_KEY
+  - name: Example API keys in documentation
+    match: your_.*_api_key
+  - name: Placeholder values
+    match: "sk_test_1234567890abcdef"
+  - name: Example keys in markdown
+    match: "AIzaSy\\.\\.\\.your_"
+
+# Only scan these file extensions
+# (Uncomment to enable - by default scans all text files)
+# scan:
+#   - .js
+#   - .ts
+#   - .jsx
+#   - .tsx
+#   - .json
+#   - .env
+
+# Secret detection settings
+secret:
+  # Show full path to files with secrets
+  show_secrets: false  # Don't show actual secret values in output
+  
+  # Ignore specific types of secrets (use with caution!)
+  # ignored_detectors:
+  #   - Generic High Entropy Secret
+
+# Minimum occurrences to trigger detection
+# (Helps reduce false positives)
+minimum_occurrences: 1
