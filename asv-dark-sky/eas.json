@@ -24,6 +24,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "/Users/stevensmith/Downloads/popkorn-472305-0d1761bce2bf.json",
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    }
   }
 }

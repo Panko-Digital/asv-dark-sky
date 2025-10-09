@@ -494,6 +494,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#2a2a2a",
     color: "#ff0000ff",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
   cameraContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -568,8 +571,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   photoContainer: {
-    width: "100%",
-    aspectRatio: 4 / 3,
+    width: "50%",
+    aspectRatio: 3 / 4,
     backgroundColor: "#1a1a1a",
     borderRadius: 12,
     overflow: "hidden",
@@ -599,8 +602,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   capturePrompt: {
-    width: "100%",
-    aspectRatio: 4 / 3,
+    width: "50%",
+    aspectRatio: 3 / 4,
     backgroundColor: "#1a1a1a",
     borderRadius: 12,
     borderWidth: 2,
