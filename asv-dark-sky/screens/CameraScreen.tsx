@@ -14,6 +14,7 @@ import { Image } from "expo-image";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { saveMeasurement } from "../utils/storage";
 import StarfieldBackground from "../components/StarfieldBackground";
+import TiltIndicator from "../components/TiltIndicator";
 
 export type ViewMode = "camera" | "review";
 
@@ -441,6 +442,7 @@ export default function CameraScreen() {
           enableTorch={false}
           animateShutter={false}
         />
+        <TiltIndicator position="top-right" />
         <View style={styles.shutterContainer}>
           <Pressable onPress={takePicture}>
             {({ pressed }) => (
