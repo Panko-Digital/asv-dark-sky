@@ -13,6 +13,7 @@ import {
 import { Image } from "expo-image";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import { saveMeasurement } from "../utils/storage";
+import StarfieldBackground from "../components/StarfieldBackground";
 
 export type ViewMode = "camera" | "review";
 
@@ -372,9 +373,9 @@ export default function CameraScreen() {
               }}
               style={styles.capturePrompt}
             >
-              <AntDesign name="camera" size={64} color="#ff0000" />
+              <AntDesign name="camera" size={32} color="#ff0000" />
               <Text style={styles.capturePromptText}>
-                Tap to capture {currentPhoto.label.toLowerCase()}
+                Capture {currentPhoto.label.toLowerCase()}
               </Text>
               {currentPhoto.type === "dark" && (
                 <Text style={styles.captureHint}>
@@ -483,6 +484,7 @@ export default function CameraScreen() {
           viewMode === "camera" && { display: "none" },
         ]}
       >
+        <StarfieldBackground />
         {renderPictures()}
       </View>
     </View>
@@ -529,7 +531,7 @@ const styles = StyleSheet.create({
   },
   reviewContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "transparent",
     paddingTop: 60,
   },
   tabContainer: {
