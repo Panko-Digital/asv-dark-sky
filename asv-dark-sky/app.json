@@ -29,6 +29,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.stesmi99.asvdarksky",
+      "deploymentTarget": "15.1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to tag sky quality measurements with geographic coordinates."
@@ -45,7 +46,10 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "package": "com.stesmi99.asvdarksky",
-      "ndkVersion": "27.0.12077973"
+      "ndkVersion": "27.0.12077973",
+      "minSdkVersion": 24,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34
     }
   },
   "extra": {

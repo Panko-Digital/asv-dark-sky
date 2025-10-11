@@ -12,7 +12,16 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "android": {
+        "minSdkVersion": 24,
+        "compileSdkVersion": 34,
+        "targetSdkVersion": 34,
+        "ndkVersion": "27.0.12077973"
+      },
+      "ios": {
+        "deploymentTarget": "15.1"
+      }
     },
     "development-simulator": {
       "developmentClient": true,
