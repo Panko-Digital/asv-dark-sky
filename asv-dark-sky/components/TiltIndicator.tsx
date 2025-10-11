@@ -48,11 +48,11 @@ const TiltIndicator: React.FC<TiltIndicatorProps> = ({
     }
   };
 
-  // Determine color based on angle (green when upright, red when tilted)
+  // Determine color based on angle (red when upright, orange when moderately tilted, green when significantly tilted)
   const getIndicatorColor = () => {
-    if (tiltAngle <= 15) return "#00ff00"; // Green - nearly vertical
+    if (tiltAngle <= 15) return "#ff0000ff"; // Red - nearly vertical
     if (tiltAngle <= 45) return "#ffaa00"; // Orange - moderate tilt
-    return "#ff0000"; // Red - significant tilt
+    return "#1eff00ff"; // Green - significant tilt
   };
 
   return (

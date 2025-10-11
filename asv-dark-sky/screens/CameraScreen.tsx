@@ -15,6 +15,7 @@ import AntDesign from "@expo/vector-icons/AntDesign";
 import { saveMeasurement } from "../utils/storage";
 import StarfieldBackground from "../components/StarfieldBackground";
 import TiltIndicator from "../components/TiltIndicator";
+import MeasurementResults from "../components/MeasurementResults";
 
 export type ViewMode = "camera" | "review";
 
@@ -22,6 +23,15 @@ export type responseFormat = {
   median_sky_brightness_dn: number;
   sky_quality_meter: number;
   sky_quality_meter_moon_adjusted?: number;
+  bortle_class: number;
+  bortle_description: string;
+  additional_measurements: {
+    naked_eye_limiting_magnitude: number;
+    luminance_cd_m2: number;
+    luminance_mcd_m2: number;
+    light_pollution_level: string;
+    astronomy_quality: string;
+  };
   moon_data?: {
     phase: string;
     illumination: number;
@@ -86,7 +96,9 @@ export default function CameraScreen() {
   const [frame, setFrame] = useState<"light" | "dark">("light");
   const [viewMode, setViewMode] = useState<ViewMode>("review");
   const [activeTab, setActiveTab] = useState<"light" | "dark">("light"); // For switching between photo views
-  const [SQM, setSQM] = useState<number | null>(null);
+  const [measurementData, setMeasurementData] = useState<responseFormat | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [exposureTime, setExposureTime] = useState<number>(3000); // in milliseconds
@@ -157,7 +169,7 @@ export default function CameraScreen() {
       setDarkFrameUri(null);
       setDarkFrameBase64(null);
     }
-    setSQM(null);
+    setMeasurementData(null);
     setError(null);
   };
 
@@ -233,7 +245,7 @@ export default function CameraScreen() {
     if (lightFrameUri && darkFrameUri) {
       setLoading(true);
       setError(null);
-      setSQM(null);
+      setMeasurementData(null);
       const preparedLight = sanitizeBase64Data(lightFrameBase64, lightFrameUri);
       const preparedDark = sanitizeBase64Data(darkFrameBase64, darkFrameUri);
 
@@ -267,13 +279,13 @@ export default function CameraScreen() {
       setLoading(false);
 
       if (!response.ok) {
-        setSQM(null);
+        setMeasurementData(null);
         const errorPayload: errorResponseFormat = await response.json();
         setError(errorPayload.error);
       } else {
         const data: responseFormat = await response.json();
 
-        setSQM(data.sky_quality_meter);
+        setMeasurementData(data);
 
         // Save measurement to local storage
         try {
@@ -416,11 +428,8 @@ export default function CameraScreen() {
             </View>
           )}
 
-          {SQM && bothPhotosTaken && (
-            <View style={styles.resultContainer}>
-              <Text style={styles.resultLabel}>SQM Reading</Text>
-              <Text style={styles.resultValue}>{SQM.toFixed(2)}</Text>
-            </View>
+          {measurementData && bothPhotosTaken && (
+            <MeasurementResults data={measurementData} />
           )}
 
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -661,25 +670,6 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "#ff0000",
     fontSize: 16,
-  },
-  resultContainer: {
-    backgroundColor: "#1a1a1a",
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#ff0000",
-    alignItems: "center",
-    width: "100%",
-  },
-  resultLabel: {
-    color: "#bbbbbb",
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  resultValue: {
-    color: "#ff0000",
-    fontSize: 36,
-    fontWeight: "bold",
   },
   errorText: {
     color: "#ff0000",

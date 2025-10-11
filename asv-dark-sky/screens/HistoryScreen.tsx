@@ -17,10 +17,65 @@ import {
   SQMMeasurement,
 } from "../utils/storage";
 
+type DisplayUnit = "sqm" | "bortle" | "nelm" | "luminance";
+
+interface DisplayConfig {
+  id: DisplayUnit;
+  label: string;
+  unit: string;
+  converter: (sqm: number) => string;
+}
+
+const displayConfigs: DisplayConfig[] = [
+  {
+    id: "sqm",
+    label: "SQM",
+    unit: "mag/arcsec²",
+    converter: (sqm: number) => sqm.toFixed(2),
+  },
+  {
+    id: "bortle",
+    label: "Bortle",
+    unit: "class",
+    converter: (sqm: number) => {
+      if (sqm >= 21.7) return "1";
+      if (sqm >= 21.5) return "2";
+      if (sqm >= 21.3) return "3";
+      if (sqm >= 20.4) return "4";
+      if (sqm >= 19.1) return "5";
+      if (sqm >= 18.0) return "6";
+      if (sqm >= 17.5) return "7";
+      if (sqm >= 16.5) return "8";
+      return "9";
+    },
+  },
+  {
+    id: "nelm",
+    label: "NELM",
+    unit: "mag",
+    converter: (sqm: number) => Math.max(1.0, sqm - 5.0).toFixed(1),
+  },
+  {
+    id: "luminance",
+    label: "Luminance",
+    unit: "mcd/m²",
+    converter: (sqm: number) => {
+      const luminance_cd_m2 = Math.pow(10, (12.6 - sqm) / 2.5);
+      const luminance_mcd_m2 = luminance_cd_m2 * 1000;
+      return luminance_mcd_m2.toFixed(3);
+    },
+  },
+];
+
 export default function HistoryScreen() {
   const [history, setHistory] = useState<SQMMeasurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [displayUnit, setDisplayUnit] = useState<DisplayUnit>("sqm");
+
+  const currentConfig =
+    displayConfigs.find((config) => config.id === displayUnit) ||
+    displayConfigs[0];
 
   const fetchHistory = async () => {
     try {
@@ -109,6 +164,33 @@ export default function HistoryScreen() {
     setExpandedId(expandedId === id ? null : id);
   };
 
+  const renderUnitToggle = () => (
+    <View style={styles.unitToggleContainer}>
+      <Text style={styles.unitToggleLabel}>Units:</Text>
+      <View style={styles.unitToggle}>
+        {displayConfigs.map((config) => (
+          <Pressable
+            key={config.id}
+            onPress={() => setDisplayUnit(config.id)}
+            style={[
+              styles.unitToggleButton,
+              displayUnit === config.id && styles.unitToggleButtonActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.unitToggleText,
+                displayUnit === config.id && styles.unitToggleTextActive,
+              ]}
+            >
+              {config.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
   const renderItem = ({ item }: { item: SQMMeasurement }) => {
     const isExpanded = expandedId === item.id;
 
@@ -127,7 +209,10 @@ export default function HistoryScreen() {
             </Text>
           </View>
           <View style={styles.cellSqm}>
-            <Text style={styles.sqmValue}>{item.sqm.toFixed(2)}</Text>
+            <Text style={styles.sqmValue}>
+              {currentConfig.converter(item.sqm)}
+            </Text>
+            <Text style={styles.sqmUnit}>{currentConfig.unit}</Text>
           </View>
           <View style={styles.cellLocation}>
             <Text style={styles.cellValueSmall} numberOfLines={1}>
@@ -172,6 +257,27 @@ export default function HistoryScreen() {
               <Text style={styles.detailLabel}>SQM Reading:</Text>
               <Text style={[styles.detailValue, styles.detailValueLarge]}>
                 {item.sqm.toFixed(2)} mag/arcsec²
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Bortle Class:</Text>
+              <Text style={styles.detailValue}>
+                Class {displayConfigs[1].converter(item.sqm)}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>NELM Estimate:</Text>
+              <Text style={styles.detailValue}>
+                {displayConfigs[2].converter(item.sqm)} {displayConfigs[2].unit}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Sky Luminance:</Text>
+              <Text style={styles.detailValue}>
+                {displayConfigs[3].converter(item.sqm)} {displayConfigs[3].unit}
               </Text>
             </View>
 
@@ -285,7 +391,7 @@ export default function HistoryScreen() {
         <Text style={styles.headerText}>Date</Text>
       </View>
       <View style={styles.headerCellSqm}>
-        <Text style={styles.headerText}>SQM</Text>
+        <Text style={styles.headerText}>{currentConfig.label}</Text>
       </View>
       <View style={styles.headerCellLocation}>
         <Text style={styles.headerText}>Location</Text>
@@ -318,18 +424,21 @@ export default function HistoryScreen() {
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       ) : (
-        <FlatList
-          data={history}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={renderEmpty}
-          contentContainerStyle={
-            history.length === 0
-              ? styles.emptyListContainer
-              : styles.listContent
-          }
-        />
+        <>
+          {renderUnitToggle()}
+          <FlatList
+            data={history}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={renderHeader}
+            ListEmptyComponent={renderEmpty}
+            contentContainerStyle={
+              history.length === 0
+                ? styles.emptyListContainer
+                : styles.listContent
+            }
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -510,6 +619,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#ff0000",
+  },
+  sqmUnit: {
+    fontSize: 10,
+    color: "#ff0000",
+    opacity: 0.7,
+    marginTop: 2,
+  },
+  unitToggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    backgroundColor: "#0a0000",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ff0000",
+  },
+  unitToggleLabel: {
+    color: "#ff0000",
+    fontSize: 14,
+    fontWeight: "600",
+    marginRight: 12,
+  },
+  unitToggle: {
+    flexDirection: "row",
+    backgroundColor: "#1a0000",
+    borderRadius: 6,
+    padding: 2,
+    flex: 1,
+  },
+  unitToggleButton: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    borderRadius: 4,
+  },
+  unitToggleButtonActive: {
+    backgroundColor: "#ff0000",
+  },
+  unitToggleText: {
+    color: "#ff0000",
+    fontSize: 12,
+    fontWeight: "600",
+    opacity: 0.7,
+  },
+  unitToggleTextActive: {
+    color: "#ffffff",
+    opacity: 1,
   },
   deleteButton: {
     width: 32,

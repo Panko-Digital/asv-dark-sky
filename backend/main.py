@@ -9,6 +9,95 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from moon_calculations import calculate_moon_phase, calculate_moon_impact, adjust_sqm_for_moon, get_moon_impact_description
 
+def sqm_to_bortle(sqm_value):
+    """
+    Convert SQM (Sky Quality Meter) value to Bortle Dark Sky Scale.
+    
+    Bortle Scale ranges from 1 (pristine dark sky) to 9+ (inner city).
+    SQM values typically range from ~15 (bright city) to ~22+ (darkest skies).
+    
+    Based on commonly accepted conversions:
+    - Bortle 1: SQM 21.7-22+ (Pristine dark sky)
+    - Bortle 2: SQM 21.5-21.7 (Typical truly dark site)
+    - Bortle 3: SQM 21.3-21.5 (Rural sky)
+    - Bortle 4: SQM 20.4-21.3 (Rural/suburban transition)
+    - Bortle 5: SQM 19.1-20.4 (Suburban sky)
+    - Bortle 6: SQM 18.0-19.1 (Bright suburban sky)
+    - Bortle 7: SQM 17.5-18.0 (Suburban/urban transition)
+    - Bortle 8: SQM 16.5-17.5 (City sky)
+    - Bortle 9: SQM <16.5 (Inner city sky)
+    """
+    if sqm_value >= 21.7:
+        return 1, "Pristine Dark Sky"
+    elif sqm_value >= 21.5:
+        return 2, "Typical Dark Site"
+    elif sqm_value >= 21.3:
+        return 3, "Rural Sky"
+    elif sqm_value >= 20.4:
+        return 4, "Rural/Suburban Transition"
+    elif sqm_value >= 19.1:
+        return 5, "Suburban Sky"
+    elif sqm_value >= 18.0:
+        return 6, "Bright Suburban Sky"
+    elif sqm_value >= 17.5:
+        return 7, "Suburban/Urban Transition"
+    elif sqm_value >= 16.5:
+        return 8, "City Sky"
+    else:
+        return 9, "Inner City Sky"
+
+def calculate_additional_measurements(sqm_value, median_brightness):
+    """
+    Calculate additional light level measurements from SQM value.
+    
+    Returns various scales and measurements commonly used in astronomy.
+    """
+    # Convert to other common measurements
+    
+    # Naked Eye Limiting Magnitude (NELM) - approximate relationship
+    # NELM ≈ SQM - 5 (rough approximation, varies with conditions)
+    nelm = max(1.0, sqm_value - 5.0)  # Clamp to reasonable minimum
+    
+    # Luminance in cd/m² (candela per square meter)
+    # SQM = -2.5 * log10(L) + C, where C ≈ 12.6 for SQM in mag/arcsec²
+    # L = 10^((C - SQM) / 2.5)
+    luminance_cd_m2 = 10 ** ((12.6 - sqm_value) / 2.5)
+    
+    # Convert luminance to other units
+    luminance_mcd_m2 = luminance_cd_m2 * 1000  # millicandela per m²
+    
+    # Artificial Light Level Index (rough scale)
+    if sqm_value >= 21.5:
+        light_pollution_level = "Minimal"
+    elif sqm_value >= 20.0:
+        light_pollution_level = "Low" 
+    elif sqm_value >= 18.5:
+        light_pollution_level = "Moderate"
+    elif sqm_value >= 17.0:
+        light_pollution_level = "High"
+    else:
+        light_pollution_level = "Severe"
+    
+    # Quality rating for astronomy
+    if sqm_value >= 21.5:
+        astronomy_quality = "Excellent"
+    elif sqm_value >= 20.5:
+        astronomy_quality = "Very Good"
+    elif sqm_value >= 19.5:
+        astronomy_quality = "Good"
+    elif sqm_value >= 18.0:
+        astronomy_quality = "Fair"
+    else:
+        astronomy_quality = "Poor"
+    
+    return {
+        "naked_eye_limiting_magnitude": round(nelm, 1),
+        "luminance_cd_m2": round(luminance_cd_m2, 6),
+        "luminance_mcd_m2": round(luminance_mcd_m2, 3),
+        "light_pollution_level": light_pollution_level,
+        "astronomy_quality": astronomy_quality
+    }
+
 # Initialize Firebase Admin (only once)
 if not firebase_admin._apps:
     # When deployed to Cloud Functions, uses Application Default Credentials
@@ -124,6 +213,10 @@ def calculate_sky_brightness(request):
         instrumental_magnitude = -2.5 * np.log10(median_value / exposure_time_s)
         sky_quality_meter = instrumental_magnitude + zero_point
         
+        # Calculate Bortle scale and additional measurements
+        bortle_class, bortle_description = sqm_to_bortle(sky_quality_meter)
+        additional_measurements = calculate_additional_measurements(sky_quality_meter, median_value)
+        
         # Calculate moon phase and impact
         measurement_timestamp = metadata.get('timestamp')
         if measurement_timestamp:
@@ -162,6 +255,9 @@ def calculate_sky_brightness(request):
             "instrumental_magnitude": float(instrumental_magnitude),
             "zero_point": float(zero_point),
             "exposure_time_s": float(exposure_time_s),
+            "bortle_class": int(bortle_class),
+            "bortle_description": bortle_description,
+            "additional_measurements": additional_measurements,
             "moon_data": {
                 "phase": moon_phase_data['phase'],
                 "illumination": moon_illumination,
@@ -189,6 +285,9 @@ def calculate_sky_brightness(request):
             "sky_quality_meter": float(sky_quality_meter),
             "sky_quality_meter_moon_adjusted": float(moon_adjusted_sqm),
             "instrumental_magnitude": float(instrumental_magnitude),
+            "bortle_class": int(bortle_class),
+            "bortle_description": bortle_description,
+            "additional_measurements": additional_measurements,
             "moon_data": {
                 "phase": moon_phase_data['phase'],
                 "illumination": moon_illumination,
