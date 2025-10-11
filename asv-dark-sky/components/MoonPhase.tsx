@@ -6,11 +6,19 @@ import {
   calculateMoonPhase,
   estimateMoonAltitude,
   getMoonImpactDescription,
+  validateMoonCalculation,
+  getMoonReferenceData,
   type MoonData,
 } from "../utils/moonCalculations";
 
 interface MoonPhaseData extends MoonData {
   emoji: string;
+  validationWarnings?: string[];
+  referenceData?: {
+    approximateRise: Date | null;
+    approximateSet: Date | null;
+    notes: string[];
+  };
 }
 
 interface MoonPhaseProps {
@@ -95,12 +103,58 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
       const phaseData = calculateMoonPhase(now);
 
       let altitude: number | undefined;
+      let validationWarnings: string[] | undefined;
+      let referenceData: any | undefined;
+
       if (location) {
         altitude = estimateMoonAltitude(
           now,
           location.latitude,
           location.longitude
         );
+
+        // Validate the calculation
+        const validation = validateMoonCalculation(
+          now,
+          location.latitude,
+          location.longitude,
+          altitude
+        );
+
+        // Get reference data for comparison
+        const refData = getMoonReferenceData(
+          now,
+          location.latitude,
+          location.longitude
+        );
+
+        validationWarnings = validation.warnings;
+        referenceData = refData;
+
+        // Debug logging for Geelong location
+        console.log("Moon calculation debug:", {
+          timestamp: now.toISOString(),
+          location: {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
+          moonData: {
+            phase: phaseData.phase,
+            illumination: phaseData.illumination,
+            calculatedAltitude: altitude,
+          },
+          validation: {
+            isValid: validation.isValid,
+            warnings: validation.warnings,
+            expectedRange: validation.expectedRange,
+          },
+          reference: {
+            approximateRise: refData.approximateRise?.toLocaleString(),
+            approximateSet: refData.approximateSet?.toLocaleString(),
+            notes: refData.notes,
+          },
+        });
       }
 
       const moonData: MoonPhaseData = {
@@ -108,6 +162,8 @@ export default function MoonPhase({ latitude, longitude }: MoonPhaseProps) {
         illumination: phaseData.illumination,
         altitude,
         emoji: getPhaseEmoji(phaseData.phase),
+        validationWarnings,
+        referenceData,
       };
 
       setMoonPhase(moonData);

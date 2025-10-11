@@ -48,11 +48,11 @@ const TiltIndicator: React.FC<TiltIndicatorProps> = ({
     }
   };
 
-  // Determine color based on angle (red when upright, orange when moderately tilted, green when significantly tilted)
+  // Determine color based on angle (green when flat/pointing at sky, red when upright)
   const getIndicatorColor = () => {
-    if (tiltAngle <= 15) return "#ff0000ff"; // Red - nearly vertical
+    if (tiltAngle <= 15) return "#00ff00"; // Green - flat/pointing at sky (good for sky photos)
     if (tiltAngle <= 45) return "#ffaa00"; // Orange - moderate tilt
-    return "#1eff00ff"; // Green - significant tilt
+    return "#ff0000"; // Red - upright/vertical (bad for sky photos)
   };
 
   return (
@@ -69,7 +69,6 @@ const TiltIndicator: React.FC<TiltIndicatorProps> = ({
         <Text style={[styles.angle, { color: getIndicatorColor() }]}>
           {tiltAngle}°
         </Text>
-        <Text style={styles.label}>tilt</Text>
       </View>
     </View>
   );
@@ -95,11 +94,6 @@ const styles = StyleSheet.create({
   angle: {
     fontSize: 20,
     fontWeight: "bold",
-  },
-  label: {
-    fontSize: 10,
-    color: "#888888",
-    marginTop: 2,
   },
 });
 
