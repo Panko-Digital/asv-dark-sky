@@ -48,10 +48,10 @@ const TiltIndicator: React.FC<TiltIndicatorProps> = ({
     }
   };
 
-  // Determine color based on angle (green when flat/pointing at sky, red when upright)
+  // Determine color based on angle (green when flat/pointing at sky, red when upright, sky is 0 on ios but 180 on android)
   const getIndicatorColor = () => {
-    if (tiltAngle <= 15) return "#00ff00"; // Green - flat/pointing at sky (good for sky photos)
-    if (tiltAngle <= 45) return "#ffaa00"; // Orange - moderate tilt
+    if (tiltAngle <= 15 || tiltAngle >= 165) return "#00ff00"; // Green - flat/pointing at sky (good for sky photos)
+    if (tiltAngle <= 45 || tiltAngle >= 135) return "#ffaa00"; // Orange - moderate tilt
     return "#ff0000"; // Red - upright/vertical (bad for sky photos)
   };
 
