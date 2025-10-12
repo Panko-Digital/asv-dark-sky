@@ -6,8 +6,9 @@ import {
   Text,
   Alert,
   Platform,
+  TouchableOpacity,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE, Circle } from "react-native-maps";
 import { useFocusEffect } from "@react-navigation/native";
 import React from "react";
 
@@ -22,8 +23,153 @@ interface Measurement {
   created_at: string;
 }
 
+interface HeatmapPoint {
+  latitude: number;
+  longitude: number;
+  intensity: number; // 0-1, where 1 is highest light pollution
+  sqm: number;
+  label: string;
+  timestamp?: string; // Optional timestamp for prioritizing recent readings
+}
+
 const BACKEND_URL =
   "https://australia-southeast2-popkorn-472305.cloudfunctions.net/get_measurements";
+
+// Mock data for testing heatmap - Melbourne region and dark sky sites
+// Timestamps simulate measurements over several months
+const mockHeatmapData: HeatmapPoint[] = [
+  // Melbourne CBD - High light pollution (recent measurements)
+  {
+    latitude: -37.8136,
+    longitude: 144.9631,
+    intensity: 1.0,
+    sqm: 15.5,
+    label: "Melbourne CBD",
+    timestamp: "2025-10-12T20:30:00.000Z", // Tonight
+  },
+  {
+    latitude: -37.82,
+    longitude: 144.97,
+    intensity: 0.95,
+    sqm: 16.0,
+    label: "South Melbourne",
+    timestamp: "2025-10-11T21:15:00.000Z", // Last night
+  },
+  {
+    latitude: -37.8,
+    longitude: 144.95,
+    intensity: 0.9,
+    sqm: 16.5,
+    label: "North Melbourne",
+    timestamp: "2025-10-10T22:00:00.000Z", // 2 days ago
+  },
+
+  // Inner suburbs - Medium-high pollution (1 week old)
+  {
+    latitude: -37.7749,
+    longitude: 144.9441,
+    intensity: 0.8,
+    sqm: 17.2,
+    label: "Brunswick",
+    timestamp: "2025-10-05T21:30:00.000Z", // 1 week ago
+  },
+  {
+    latitude: -37.8477,
+    longitude: 144.9633,
+    intensity: 0.75,
+    sqm: 17.5,
+    label: "South Yarra",
+    timestamp: "2025-10-04T20:45:00.000Z",
+  },
+  {
+    latitude: -37.7879,
+    longitude: 145.0123,
+    intensity: 0.7,
+    sqm: 17.8,
+    label: "Richmond",
+    timestamp: "2025-10-03T22:30:00.000Z",
+  },
+
+  // Outer suburbs - Medium pollution (2-3 weeks old)
+  {
+    latitude: -37.7228,
+    longitude: 144.8501,
+    intensity: 0.6,
+    sqm: 18.5,
+    label: "Geelong",
+    timestamp: "2025-09-28T21:00:00.000Z", // 2 weeks ago
+  },
+  {
+    latitude: -37.8814,
+    longitude: 145.1383,
+    intensity: 0.55,
+    sqm: 18.8,
+    label: "Dandenong",
+    timestamp: "2025-09-25T20:15:00.000Z",
+  },
+  {
+    latitude: -37.6872,
+    longitude: 145.0421,
+    intensity: 0.5,
+    sqm: 19.2,
+    label: "Whittlesea",
+    timestamp: "2025-09-20T21:45:00.000Z", // 3 weeks ago
+  },
+
+  // Regional areas - Lower pollution (1 month old)
+  {
+    latitude: -37.5622,
+    longitude: 144.9044,
+    intensity: 0.3,
+    sqm: 20.1,
+    label: "Kilmore",
+    timestamp: "2025-09-12T22:00:00.000Z", // 1 month ago
+  },
+  {
+    latitude: -37.4713,
+    longitude: 144.7852,
+    intensity: 0.25,
+    sqm: 20.5,
+    label: "Romsey",
+    timestamp: "2025-09-08T21:30:00.000Z",
+  },
+
+  // Leon Mow Dark Sky Site - Very low pollution (multiple measurements to test clustering)
+  {
+    latitude: -37.3903,
+    longitude: 144.7664,
+    intensity: 0.1,
+    sqm: 21.2,
+    label: "Leon Mow Dark Sky Site",
+    timestamp: "2025-10-12T23:00:00.000Z", // Most recent - should be displayed
+  },
+  {
+    latitude: -37.3905, // Slightly different location (nearby)
+    longitude: 144.7662,
+    intensity: 0.12,
+    sqm: 21.0,
+    label: "Leon Mow (older)",
+    timestamp: "2025-09-15T22:00:00.000Z", // Older measurement - should be clustered
+  },
+
+  // Remote dark sky areas - Minimal pollution
+  {
+    latitude: -37.25,
+    longitude: 144.5,
+    intensity: 0.05,
+    sqm: 21.8,
+    label: "Remote Dark Sky",
+    timestamp: "2025-08-20T23:30:00.000Z", // 2 months ago
+  },
+  {
+    latitude: -37.1,
+    longitude: 144.3,
+    intensity: 0.02,
+    sqm: 22.1,
+    label: "Pristine Dark Sky",
+    timestamp: "2025-08-15T22:45:00.000Z", // 2 months ago
+  },
+];
 
 // Dark mode map styling
 const darkMapStyle = [
@@ -128,15 +274,17 @@ const darkMapStyle = [
 export default function MapScreen() {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMockData, setShowMockData] = useState(false); // Toggle for testing
+  const [showLegend, setShowLegend] = useState(true); // Toggle legend visibility
   const [region, setRegion] = useState({
-    latitude: -38.15, // Geelong area default
-    longitude: 144.35,
-    latitudeDelta: 0.5,
-    longitudeDelta: 0.5,
+    latitude: -37.6, // Center between Melbourne and dark sky sites
+    longitude: 144.8,
+    latitudeDelta: 1.0,
+    longitudeDelta: 1.0,
   });
   const [currentZoom, setCurrentZoom] = useState({
-    latitudeDelta: 0.5,
-    longitudeDelta: 0.5,
+    latitudeDelta: 1.0,
+    longitudeDelta: 1.0,
   });
 
   const fetchMeasurements = async () => {
@@ -180,14 +328,39 @@ export default function MapScreen() {
     }, [])
   );
 
-  // Calculate distance between two coordinates in kilometers
+  // Convert SQM to intensity (0-1 scale where 1 = high light pollution)
+  const sqmToIntensity = (sqm: number): number => {
+    // SQM scale typically ranges from ~15 (city) to ~22 (pristine)
+    // Convert to 0-1 intensity where 1 = highest pollution (lowest SQM)
+    const clampedSqm = Math.max(15, Math.min(22, sqm));
+    return (22 - clampedSqm) / 7; // Normalize to 0-1
+  };
+
+  // Get color for light pollution intensity
+  const getHeatmapColor = (intensity: number, alpha: number = 1): string => {
+    // Create gradient from green (low pollution) to red (high pollution)
+    const red = Math.round(intensity * 255);
+    const green = Math.round((1 - intensity) * 255);
+    const blue = 0;
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  };
+
+  // Generate radius based on zoom level and intensity
+  const getCircleRadius = (intensity: number): number => {
+    const baseRadius = 6000; // Reduced from 10000 for smaller circles
+    const zoomFactor = Math.min(currentZoom.latitudeDelta * 2, 1); // Adjust for zoom
+    const intensityFactor = 0.5 + intensity * 0.5; // Bigger circles for higher pollution
+    return baseRadius * zoomFactor * intensityFactor;
+  };
+
+  // Calculate distance between two coordinates in meters
   const getDistance = (
     lat1: number,
     lon1: number,
     lat2: number,
     lon2: number
   ): number => {
-    const R = 6371; // Earth's radius in km
+    const R = 6371000; // Earth's radius in meters
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
@@ -200,48 +373,110 @@ export default function MapScreen() {
     return R * c;
   };
 
-  // Calculate minimum distance threshold based on zoom level
-  const getMinDistance = (latitudeDelta: number): number => {
-    // More zoomed in = smaller latitudeDelta = smaller minimum distance
-    // Adjust these values to tune the clustering behavior
-    if (latitudeDelta > 1) return 5; // Very zoomed out: 5km spacing
-    if (latitudeDelta > 0.5) return 2; // Zoomed out: 2km spacing
-    if (latitudeDelta > 0.1) return 0.5; // Medium zoom: 500m spacing
-    if (latitudeDelta > 0.05) return 0.2; // Zoomed in: 200m spacing
-    return 0.05; // Very zoomed in: 50m spacing (show all)
+  // Cluster nearby points - use most recent reading instead of averaging
+  const clusterHeatmapPoints = (points: HeatmapPoint[]): HeatmapPoint[] => {
+    if (points.length === 0) return [];
+
+    const clustered: HeatmapPoint[] = [];
+    const used = new Set<number>();
+    const clusterThreshold = 3000; // Cluster points within 3km (reduced for tighter clustering)
+
+    console.log(`[Clustering] Starting with ${points.length} points`);
+
+    // Process all points
+    points.forEach((point, index) => {
+      if (used.has(index)) return;
+
+      // Find all nearby points (regardless of intensity - location is primary factor)
+      const nearbyPoints = points
+        .map((p, i) => ({ point: p, index: i }))
+        .filter(({ point: p, index: i }) => {
+          if (used.has(i)) return false;
+
+          const distance = getDistance(
+            point.latitude,
+            point.longitude,
+            p.latitude,
+            p.longitude
+          );
+
+          // Cluster based purely on proximity
+          return distance < clusterThreshold;
+        });
+
+      if (nearbyPoints.length > 0) {
+        console.log(
+          `[Clustering] Found ${
+            nearbyPoints.length
+          } nearby points for location (${point.latitude.toFixed(
+            4
+          )}, ${point.longitude.toFixed(4)})`
+        );
+
+        // Find the most recent reading in the cluster
+        let mostRecent = nearbyPoints[0];
+
+        if (nearbyPoints.length > 1) {
+          // Log timestamps for debugging
+          nearbyPoints.forEach(({ point: p }) => {
+            console.log(
+              `  - ${p.label}: ${p.timestamp || "no timestamp"}, SQM: ${p.sqm}`
+            );
+          });
+
+          mostRecent = nearbyPoints.reduce((latest, current) => {
+            // If no timestamps, keep first point
+            if (!current.point.timestamp || !latest.point.timestamp) {
+              return latest;
+            }
+            const currentTime = new Date(current.point.timestamp).getTime();
+            const latestTime = new Date(latest.point.timestamp).getTime();
+            return currentTime > latestTime ? current : latest;
+          }, nearbyPoints[0]);
+
+          console.log(
+            `  → Selected most recent: ${mostRecent.point.label} (${mostRecent.point.timestamp})`
+          );
+        }
+
+        // Use the most recent reading's data
+        clustered.push({
+          latitude: mostRecent.point.latitude,
+          longitude: mostRecent.point.longitude,
+          intensity: mostRecent.point.intensity,
+          sqm: mostRecent.point.sqm,
+          label:
+            nearbyPoints.length > 1
+              ? `${mostRecent.point.label} (${nearbyPoints.length} readings)`
+              : mostRecent.point.label,
+          timestamp: mostRecent.point.timestamp,
+        });
+
+        // Mark all points in cluster as used
+        nearbyPoints.forEach(({ index: i }) => {
+          used.add(i);
+        });
+      }
+    });
+
+    console.log(
+      `[Clustering] Reduced from ${points.length} to ${clustered.length} points`
+    );
+    return clustered;
   };
 
-  // Filter markers to prevent overlapping based on current zoom
-  const getVisibleMarkers = (): Measurement[] => {
-    const minDistance = getMinDistance(currentZoom.latitudeDelta);
-    const visible: Measurement[] = [];
-
-    // Sort by SQM (show better quality readings preferentially)
-    const sorted = [...measurements].sort(
-      (a, b) => b.sky_quality_meter - a.sky_quality_meter
-    );
-
-    for (const measurement of sorted) {
-      if (!measurement.location) continue;
-
-      // Check if this marker is too close to any already visible marker
-      const tooClose = visible.some((visibleMarker) => {
-        if (!visibleMarker.location) return false;
-        const distance = getDistance(
-          measurement.location!.latitude,
-          measurement.location!.longitude,
-          visibleMarker.location.latitude,
-          visibleMarker.location.longitude
-        );
-        return distance < minDistance;
-      });
-
-      if (!tooClose) {
-        visible.push(measurement);
-      }
-    }
-
-    return visible;
+  // Convert real measurements to heatmap points
+  const convertMeasurementsToHeatmap = (): HeatmapPoint[] => {
+    return measurements
+      .filter((m) => m.location)
+      .map((m) => ({
+        latitude: m.location!.latitude,
+        longitude: m.location!.longitude,
+        intensity: sqmToIntensity(m.sky_quality_meter),
+        sqm: m.sky_quality_meter,
+        label: `SQM ${m.sky_quality_meter.toFixed(1)}`,
+        timestamp: m.created_at,
+      }));
   };
 
   const handleRegionChangeComplete = (newRegion: typeof region) => {
@@ -251,16 +486,16 @@ export default function MapScreen() {
     });
   };
 
-  const getMarkerColor = (sqm: number) => {
-    // Color code based on SQM value
-    // Darker skies (higher SQM) = better = green
-    // Brighter skies (lower SQM) = worse = red
-    if (sqm >= 21) return "#00ff00"; // Excellent (green)
-    if (sqm >= 20) return "#88ff00"; // Good (yellow-green)
-    if (sqm >= 19) return "#ffff00"; // Fair (yellow)
-    if (sqm >= 18) return "#ff8800"; // Poor (orange)
-    return "#ff0000"; // Very poor (red)
-  };
+  // Prepare heatmap data (must be before any conditional returns for hooks)
+  const heatmapData = showMockData
+    ? mockHeatmapData
+    : convertMeasurementsToHeatmap();
+
+  // Apply clustering to reduce rendering load (useMemo must be called unconditionally)
+  const clusteredData = React.useMemo(
+    () => clusterHeatmapPoints(heatmapData),
+    [heatmapData]
+  );
 
   if (loading) {
     return (
@@ -282,31 +517,95 @@ export default function MapScreen() {
         showsMyLocationButton={true}
         onRegionChangeComplete={handleRegionChangeComplete}
       >
-        {getVisibleMarkers().map((measurement) => {
-          if (!measurement.location) return null;
+        {/* Render heatmap circles */}
+        {clusteredData.map((point, index) => (
+          <Circle
+            key={`heatmap-${index}`}
+            center={{
+              latitude: point.latitude,
+              longitude: point.longitude,
+            }}
+            radius={getCircleRadius(point.intensity)}
+            fillColor={getHeatmapColor(point.intensity, 0.19)} // 19% opacity (30/255 ≈ 0.19)
+            strokeColor={getHeatmapColor(point.intensity, 0.38)} // 38% opacity (60/255 ≈ 0.38)
+            strokeWidth={1}
+          />
+        ))}
 
-          const sqm = measurement.sky_quality_meter;
-
-          return (
-            <Marker
-              key={measurement.id}
-              coordinate={{
-                latitude: measurement.location.latitude,
-                longitude: measurement.location.longitude,
-              }}
-              anchor={{ x: 0.5, y: 1.5 }}
-            >
-              <View style={styles.markerContainer}>
-                <View style={styles.markerCircle}>
-                  <Text style={styles.markerText}>{sqm.toFixed(1)}</Text>
-                </View>
+        {/* Render measurement markers on top of heatmap */}
+        {clusteredData.map((point, index) => (
+          <Marker
+            key={`marker-${index}`}
+            coordinate={{
+              latitude: point.latitude,
+              longitude: point.longitude,
+            }}
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View style={styles.markerContainer}>
+              <View
+                style={[
+                  styles.markerCircle,
+                  { borderColor: getHeatmapColor(point.intensity) },
+                ]}
+              >
+                <Text style={[styles.markerText]}>{point.sqm.toFixed(1)}</Text>
               </View>
-            </Marker>
-          );
-        })}
+            </View>
+          </Marker>
+        ))}
       </MapView>
 
-      {measurements.length === 0 && (
+      {/* Show Scale Button - only visible when legend is hidden */}
+      {!showLegend && (
+        <View style={styles.showScaleContainer}>
+          <TouchableOpacity
+            style={styles.showScaleButton}
+            onPress={() => setShowLegend(true)}
+          >
+            <Text style={styles.showScaleText}>Show Scale</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Legend */}
+      {showLegend && (
+        <View style={styles.legendContainer}>
+          <View style={styles.legendHeader}>
+            <Text style={styles.legendTitle}>Light Pollution Scale</Text>
+            <TouchableOpacity
+              style={styles.legendToggleButton}
+              onPress={() => setShowLegend(!showLegend)}
+            >
+              <Text style={styles.legendToggleText}>Hide</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.legendBar}>
+            <View style={styles.legendGradient}>
+              {[0, 0.25, 0.5, 0.75, 1.0].map((intensity, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.legendSegment,
+                    { backgroundColor: getHeatmapColor(intensity) },
+                  ]}
+                />
+              ))}
+            </View>
+            <View style={styles.legendLabels}>
+              <Text style={styles.legendLabel}>Dark Sky</Text>
+              <Text style={styles.legendLabel}>City</Text>
+            </View>
+          </View>
+          {showMockData && (
+            <Text style={styles.legendNote}>
+              Showing mock data for Melbourne region
+            </Text>
+          )}
+        </View>
+      )}
+
+      {measurements.length === 0 && !showMockData && (
         <View style={styles.noDataContainer}>
           <Text style={styles.noDataText}>
             No measurements with location data
@@ -340,26 +639,104 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   markerContainer: {
-    width: 80,
-    height: 80,
     justifyContent: "center",
     alignItems: "center",
-    position: "relative",
   },
   markerCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "transparent",
-    borderWidth: 3,
-    borderColor: "#ff0000",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 0,
     justifyContent: "center",
     alignItems: "center",
-    position: "absolute",
-    left: 0,
-    top: 0,
   },
   markerText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "#ffffff",
+  },
+  legendContainer: {
+    position: "absolute",
+    bottom: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    borderRadius: 10,
+    padding: 15,
+    borderColor: "#ff0000",
+    borderWidth: 1,
+  },
+  legendHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  legendTitle: {
+    color: "#ff0000",
+    fontSize: 14,
+    fontWeight: "bold",
+    flex: 1,
+    textAlign: "center",
+  },
+  legendToggleButton: {
+    backgroundColor: "rgba(255, 0, 0, 0.1)",
+    borderColor: "#ff0000",
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    position: "absolute",
+    right: 0,
+  },
+  legendToggleText: {
+    color: "#ff0000",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  legendBar: {
+    marginBottom: 5,
+  },
+  legendGradient: {
+    flexDirection: "row",
+    height: 20,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginBottom: 5,
+  },
+  legendSegment: {
+    flex: 1,
+  },
+  legendLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  legendLabel: {
+    color: "#ff0000",
+    fontSize: 12,
+  },
+  legendNote: {
+    color: "#ff0000",
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 5,
+    fontStyle: "italic",
+  },
+  showScaleContainer: {
+    position: "absolute",
+    bottom: 100,
+    right: 20,
+    zIndex: 10,
+  },
+  showScaleButton: {
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    borderColor: "#ff0000",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  showScaleText: {
     color: "#ff0000",
     fontSize: 11,
     fontWeight: "bold",
