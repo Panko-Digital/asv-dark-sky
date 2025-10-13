@@ -158,7 +158,8 @@ def calculate_sky_brightness(request):
         light_image_b64 = request_json.get("light_image")
         dark_image_b64 = request_json.get("dark_image")
         zero_point = request_json.get("zero_point", 20.0)
-        exposure_time_s = request_json.get("exposure_time_s", 3)
+        # Cap exposure time at 3 seconds maximum to prevent overexposure
+        exposure_time_s = min(request_json.get("exposure_time_s", 3), 3.0)
         metadata = request_json.get("metadata", {})
 
         if not light_image_b64 or not dark_image_b64:
@@ -197,11 +198,33 @@ def calculate_sky_brightness(request):
                 "dark_shape": dark_frame.shape
             }), 400, headers)
 
+        # Check for image saturation before processing
+        # Detect if light frame has too many saturated (overexposed) pixels
+        saturated_pixels = np.sum(light_frame >= 254)  # Near maximum value (255)
+        total_pixels = light_frame.size
+        saturation_percentage = (saturated_pixels / total_pixels) * 100
+        
+        if saturation_percentage > 5.0:
+            return (json.dumps({
+                "error": f"Image is overexposed ({saturation_percentage:.1f}% saturated pixels). Please reduce exposure time or point camera at darker area.",
+                "saturation_percentage": float(saturation_percentage),
+                "saturated_pixels": int(saturated_pixels),
+                "total_pixels": int(total_pixels)
+            }), 400, headers)
+
         # Perform the dark frame subtraction
         subtracted_image = cv2.subtract(light_frame.astype(np.int16), dark_frame.astype(np.int16))
 
         # Calculate the median pixel value
         median_value = np.median(subtracted_image)
+        
+        # Check if median value is too high (approaching saturation)
+        if median_value > 200:
+            return (json.dumps({
+                "error": f"Image brightness too high (median: {median_value:.1f}). Sky may be too bright or exposure time too long. Try reducing exposure time.",
+                "median_value": float(median_value),
+                "recommended_action": "Reduce exposure time or wait for darker conditions"
+            }), 400, headers)
         
         # Calculate instrumental magnitude and SQM score
         if median_value <= 0:
