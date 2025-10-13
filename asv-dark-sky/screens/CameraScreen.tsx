@@ -119,6 +119,7 @@ export default function CameraScreen() {
     null
   );
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   const [isCameraActive, setIsCameraActive] = useState(false);
 
@@ -219,11 +220,15 @@ export default function CameraScreen() {
   };
 
   const takePicture = async () => {
+    if (isCapturing) return;
+
     try {
       if (!camera.current) {
         Alert.alert("Error", "Camera not ready");
         return;
       }
+
+      setIsCapturing(true);
 
       const photo = await camera.current.takePhoto({
         enableShutterSound: false,
@@ -236,6 +241,7 @@ export default function CameraScreen() {
           "Error",
           "Failed to capture photo data. Please try taking the picture again."
         );
+        setIsCapturing(false);
         return;
       }
 
@@ -266,12 +272,14 @@ export default function CameraScreen() {
         }
 
         setViewMode("review");
+        setIsCapturing(false);
       };
 
       reader.readAsDataURL(blob);
     } catch (error) {
       console.error("Error taking picture:", error);
       Alert.alert("Camera Error", `Failed to take picture: ${error}`);
+      setIsCapturing(false);
     }
   };
 
@@ -512,18 +520,23 @@ export default function CameraScreen() {
           device={device}
           isActive={isCameraActive}
           photo={true}
-          format={format}
-          exposure={0} // Manual exposure adjustment (0 = auto, negative = darker, positive = brighter)
+          exposure={device.maxExposure} // Use max exposure for longest shutter
         />
         <TiltIndicator position="top-right" />
+        {isCapturing && (
+          <View style={styles.captureOverlay}>
+            <ActivityIndicator size="large" color="#ff0000" />
+            <Text style={styles.captureText}>Capturing...</Text>
+          </View>
+        )}
         <View style={styles.shutterContainer}>
-          <Pressable onPress={takePicture}>
+          <Pressable onPress={takePicture} disabled={isCapturing}>
             {({ pressed }) => (
               <View
                 style={[
                   styles.shutterBtn,
                   {
-                    opacity: pressed ? 0.5 : 1,
+                    opacity: pressed || isCapturing ? 0.5 : 1,
                   },
                 ]}
               >
@@ -531,7 +544,7 @@ export default function CameraScreen() {
                   style={[
                     styles.shutterBtnInner,
                     {
-                      backgroundColor: "white",
+                      backgroundColor: isCapturing ? "#ff0000" : "white",
                     },
                   ]}
                 />
@@ -596,6 +609,22 @@ const styles = StyleSheet.create({
     color: "#888888",
     fontSize: 14,
     textAlign: "center",
+  },
+  captureOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  captureText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 12,
   },
   shutterContainer: {
     position: "absolute",
