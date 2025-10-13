@@ -520,6 +520,9 @@ export default function CameraScreen() {
           <View style={styles.captureOverlay}>
             <ActivityIndicator size="large" color="#ff0000" />
             <Text style={styles.captureText}>Capturing...</Text>
+            <Text style={styles.captureSubText}>
+              {exposureTime / 1000}s exposure
+            </Text>
           </View>
         )}
         <View style={styles.shutterContainer}>
@@ -533,14 +536,11 @@ export default function CameraScreen() {
                   },
                 ]}
               >
-                <View
-                  style={[
-                    styles.shutterBtnInner,
-                    {
-                      backgroundColor: isCapturing ? "#ff0000" : "white",
-                    },
-                  ]}
-                />
+                {isCapturing ? (
+                  <ActivityIndicator size="small" color="#ff0000" />
+                ) : (
+                  <View style={styles.shutterBtnInner} />
+                )}
               </View>
             )}
           </Pressable>
@@ -612,12 +612,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
+    zIndex: 10,
   },
   captureText: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
     marginTop: 12,
+  },
+  captureSubText: {
+    color: "#cccccc",
+    fontSize: 14,
+    marginTop: 8,
   },
   shutterContainer: {
     position: "absolute",
@@ -638,11 +644,13 @@ const styles = StyleSheet.create({
     borderRadius: 45,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 20,
   },
   shutterBtnInner: {
     width: 70,
     height: 70,
     borderRadius: 50,
+    backgroundColor: "white",
   },
   reviewContainer: {
     ...StyleSheet.absoluteFillObject,

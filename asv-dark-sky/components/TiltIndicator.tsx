@@ -77,7 +77,7 @@ const TiltIndicator: React.FC<TiltIndicatorProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    zIndex: 100,
+    zIndex: 200,
   },
   circle: {
     width: 70,
