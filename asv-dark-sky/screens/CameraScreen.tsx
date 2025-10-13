@@ -481,8 +481,14 @@ export default function CameraScreen() {
   const renderCamera = () => {
     if (!device) {
       return (
-        <View style={styles.camera}>
-          <Text style={styles.loadingText}>Loading camera...</Text>
+        <View style={styles.cameraMessageContainer}>
+          <Text style={styles.cameraMessageText}>
+            No camera device available.
+          </Text>
+          <Text style={styles.cameraMessageSubText}>
+            Please ensure the app has camera permissions and try restarting. A
+            new build may be required.
+          </Text>
         </View>
       );
     }
@@ -493,7 +499,7 @@ export default function CameraScreen() {
           ref={camera}
           style={styles.camera}
           device={device}
-          isActive={viewMode === "camera"}
+          isActive={isCameraActive}
           photo={true}
           format={format}
           exposure={0} // Manual exposure adjustment (0 = auto, negative = darker, positive = brighter)
@@ -562,6 +568,24 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   camera: StyleSheet.absoluteFillObject,
+  cameraMessageContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+    padding: 20,
+  },
+  cameraMessageText: {
+    color: "#ff0000",
+    fontSize: 18,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  cameraMessageSubText: {
+    color: "#888888",
+    fontSize: 14,
+    textAlign: "center",
+  },
   shutterContainer: {
     position: "absolute",
     bottom: 44,
