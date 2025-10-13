@@ -1,4 +1,3 @@
-import { CameraMode, CameraView, useCameraPermissions } from "expo-camera";
 import { useRef, useState, useEffect } from "react";
 import * as Location from "expo-location";
 import {
@@ -16,6 +15,13 @@ import { saveMeasurement } from "../utils/storage";
 import StarfieldBackground from "../components/StarfieldBackground";
 import TiltIndicator from "../components/TiltIndicator";
 import MeasurementResults from "../components/MeasurementResults";
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  useCameraFormat,
+} from "react-native-vision-camera";
+import React from "react";
 
 export type ViewMode = "camera" | "review";
 
@@ -85,14 +91,21 @@ const sanitizeBase64Data = (data: string, uri?: string | null) => {
 };
 
 export default function CameraScreen() {
-  const [permission, requestPermission] = useCameraPermissions();
-  const ref = useRef<CameraView>(null);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const camera = useRef<Camera>(null);
+  const device = useCameraDevice("back");
+
+  // Select camera format optimized for low-light photography
+  const format = useCameraFormat(device, [
+    { photoResolution: "max" }, // Maximum resolution
+    { photoHdr: false }, // Disable HDR for manual exposure control
+  ]);
+
   const [lightFrameUri, setLightFrameUri] = useState<string | null>(null);
   const [lightFrameBase64, setLightFrameBase64] = useState<string | null>(null);
   const [darkFrameUri, setDarkFrameUri] = useState<string | null>(null);
   const [darkFrameBase64, setDarkFrameBase64] = useState<string | null>(null);
 
-  const [mode, setMode] = useState<CameraMode>("picture");
   const [frame, setFrame] = useState<"light" | "dark">("light");
   const [viewMode, setViewMode] = useState<ViewMode>("review");
   const [activeTab, setActiveTab] = useState<"light" | "dark">("light"); // For switching between photo views
@@ -128,11 +141,11 @@ export default function CameraScreen() {
     })();
   }, []);
 
-  if (!permission) {
+  if (hasPermission === null) {
     return null;
   }
 
-  if (!permission.granted) {
+  if (hasPermission === false) {
     return (
       <View style={styles.container}>
         <Text
@@ -175,17 +188,18 @@ export default function CameraScreen() {
 
   const takePicture = async () => {
     try {
-      const photo = await ref.current?.takePictureAsync({
-        quality: 0.8,
-        base64: true,
-        exif: false,
-        skipProcessing: true,
-        // Explicitly disable shutter sound and preview animation
-        isImageMirror: false,
+      if (!camera.current) {
+        Alert.alert("Error", "Camera not ready");
+        return;
+      }
+
+      const photo = await camera.current.takePhoto({
+        enableShutterSound: false,
+        flash: "off",
       });
 
-      if (!photo || !photo.uri || !photo.base64) {
-        console.log("Missing URI or base64 data", photo);
+      if (!photo || !photo.path) {
+        console.log("Missing photo path", photo);
         Alert.alert(
           "Error",
           "Failed to capture photo data. Please try taking the picture again."
@@ -194,29 +208,35 @@ export default function CameraScreen() {
       }
 
       console.log("Photo taken:", {
-        uri: photo.uri,
+        path: photo.path,
         width: photo.width,
         height: photo.height,
-        base64Length: photo.base64.length,
       });
-      console.log("Platform:", Platform.OS);
 
-      const sanitized = sanitizeBase64Data(photo.base64, photo.uri);
-      console.log("Sanitized base64 length:", sanitized.payload.length);
+      // Convert photo to base64
+      const photoUri = `file://${photo.path}`;
+      const response = await fetch(photoUri);
+      const blob = await response.blob();
+      const reader = new FileReader();
 
-      console.log("Photo URI accessible:", await checkUriAccessible(photo.uri));
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        const sanitized = sanitizeBase64Data(base64data, photoUri);
 
-      if (frame === "light") {
-        setLightFrameUri(photo.uri);
-        setLightFrameBase64(sanitized.dataUri);
-        // After taking sky photo, switch to dark photo tab
-        setActiveTab("dark");
-      } else {
-        setDarkFrameUri(photo.uri);
-        setDarkFrameBase64(sanitized.dataUri);
-      }
+        if (frame === "light") {
+          setLightFrameUri(photoUri);
+          setLightFrameBase64(sanitized.dataUri);
+          // After taking sky photo, switch to dark photo tab
+          setActiveTab("dark");
+        } else {
+          setDarkFrameUri(photoUri);
+          setDarkFrameBase64(sanitized.dataUri);
+        }
 
-      setViewMode("review");
+        setViewMode("review");
+      };
+
+      reader.readAsDataURL(blob);
     } catch (error) {
       console.error("Error taking picture:", error);
       Alert.alert("Camera Error", `Failed to take picture: ${error}`);
@@ -380,7 +400,6 @@ export default function CameraScreen() {
           ) : (
             <Pressable
               onPress={() => {
-                setMode("picture");
                 setFrame(currentPhoto.type);
                 setViewMode("camera");
               }}
@@ -439,17 +458,24 @@ export default function CameraScreen() {
   };
 
   const renderCamera = () => {
+    if (!device) {
+      return (
+        <View style={styles.camera}>
+          <Text style={styles.loadingText}>Loading camera...</Text>
+        </View>
+      );
+    }
+
     return (
       <>
-        <CameraView
+        <Camera
+          ref={camera}
           style={styles.camera}
-          ref={ref}
-          mode={mode}
-          mute={true}
-          responsiveOrientationWhenOrientationLocked
-          flash="off"
-          enableTorch={false}
-          animateShutter={false}
+          device={device}
+          isActive={viewMode === "camera"}
+          photo={true}
+          format={format}
+          exposure={0} // Manual exposure adjustment (0 = auto, negative = darker, positive = brighter)
         />
         <TiltIndicator position="top-right" />
         <View style={styles.shutterContainer}>
@@ -467,7 +493,7 @@ export default function CameraScreen() {
                   style={[
                     styles.shutterBtnInner,
                     {
-                      backgroundColor: mode === "picture" ? "white" : "red",
+                      backgroundColor: "white",
                     },
                   ]}
                 />

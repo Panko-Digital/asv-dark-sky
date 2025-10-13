@@ -84,14 +84,14 @@ const MeasurementResults: React.FC<MeasurementResultsProps> = ({ data }) => {
           </Text>
         </View>
 
-        {data.sky_quality_meter_moon_adjusted && (
-          <View style={styles.tableRow}>
-            <Text style={styles.tableLabel}>Moon Adjusted</Text>
-            <Text style={styles.tableValue}>
-              {data.sky_quality_meter_moon_adjusted.toFixed(2)} mag/arcsec²
-            </Text>
-          </View>
-        )}
+        <View style={styles.tableRow}>
+          <Text style={styles.tableLabel}>Moon Adjusted</Text>
+          <Text style={styles.tableValue}>
+            {data.sky_quality_meter_moon_adjusted
+              ? `${data.sky_quality_meter_moon_adjusted.toFixed(2)} mag/arcsec²`
+              : "—"}
+          </Text>
+        </View>
 
         <View style={styles.tableRow}>
           <Text style={styles.tableLabel}>Bortle Scale</Text>
@@ -136,14 +136,14 @@ const MeasurementResults: React.FC<MeasurementResultsProps> = ({ data }) => {
     <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
       <View style={styles.dataTable}>
         <View style={styles.tableRow}>
-          <Text style={styles.tableLabel}>Sky Luminance</Text>
+          <Text style={styles.tableLabel}>Sky Luminance (cd/m²)</Text>
           <Text style={styles.tableValue}>
             {data.additional_measurements.luminance_cd_m2.toFixed(6)} cd/m²
           </Text>
         </View>
 
         <View style={styles.tableRow}>
-          <Text style={styles.tableLabel}>Sky Luminance</Text>
+          <Text style={styles.tableLabel}>Sky Luminance (mcd/m²)</Text>
           <Text style={styles.tableValue}>
             {data.additional_measurements.luminance_mcd_m2.toFixed(3)} mcd/m²
           </Text>
@@ -161,9 +161,12 @@ const MeasurementResults: React.FC<MeasurementResultsProps> = ({ data }) => {
 
         <View style={styles.tableRow}>
           <Text style={styles.tableLabel}>Bortle Classification</Text>
-          <Text style={styles.tableValue}>
-            Class {data.bortle_class} - {data.bortle_description}
-          </Text>
+          <Text style={styles.tableValue}>Class {data.bortle_class}</Text>
+        </View>
+
+        <View style={styles.tableRow}>
+          <Text style={styles.tableLabel}>Sky Description</Text>
+          <Text style={styles.tableValue}>{data.bortle_description}</Text>
         </View>
 
         <View style={styles.tableRow}>
@@ -199,37 +202,46 @@ const MeasurementResults: React.FC<MeasurementResultsProps> = ({ data }) => {
             </Text>
           </View>
 
-          {data.moon_data.altitude !== null && (
-            <View style={styles.tableRow}>
-              <Text style={styles.tableLabel}>Altitude</Text>
-              <Text style={styles.tableValue}>
-                {data.moon_data.altitude.toFixed(1)}°
-              </Text>
-            </View>
-          )}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableLabel}>Altitude</Text>
+            <Text style={styles.tableValue}>
+              {data.moon_data.altitude !== null
+                ? `${data.moon_data.altitude.toFixed(1)}°`
+                : "—"}
+            </Text>
+          </View>
 
           <View style={styles.tableRow}>
-            <Text style={styles.tableLabel}>Impact</Text>
+            <Text style={styles.tableLabel}>Sky Impact</Text>
             <Text style={styles.tableValue}>
               {data.moon_data.impact_magnitude.toFixed(2)} mag
             </Text>
           </View>
 
           <View style={styles.tableRow}>
-            <Text style={styles.tableLabel}>Effect</Text>
+            <Text style={styles.tableLabel}>Impact Description</Text>
             <Text style={styles.tableValue}>
               {data.moon_data.impact_description}
             </Text>
           </View>
 
-          {data.sky_quality_meter_moon_adjusted && (
-            <View style={styles.tableRow}>
-              <Text style={styles.tableLabel}>Adjusted SQM</Text>
-              <Text style={styles.tableValue}>
-                {data.sky_quality_meter_moon_adjusted.toFixed(2)} mag/arcsec²
-              </Text>
-            </View>
-          )}
+          <View style={styles.tableRow}>
+            <Text style={styles.tableLabel}>Adjusted SQM</Text>
+            <Text style={styles.tableValue}>
+              {data.sky_quality_meter_moon_adjusted
+                ? `${data.sky_quality_meter_moon_adjusted.toFixed(
+                    2
+                  )} mag/arcsec²`
+                : "—"}
+            </Text>
+          </View>
+
+          <View style={styles.tableRow}>
+            <Text style={styles.tableLabel}>Original SQM</Text>
+            <Text style={styles.tableValue}>
+              {data.sky_quality_meter.toFixed(2)} mag/arcsec²
+            </Text>
+          </View>
         </View>
       ) : (
         <View style={styles.noData}>

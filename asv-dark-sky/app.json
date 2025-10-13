@@ -14,6 +14,13 @@
         }
       ],
       [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "$(PRODUCT_NAME) needs camera access to capture sky photos for light pollution measurements.",
+          "enableMicrophonePermission": false
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to tag sky quality measurements with geographic coordinates.",
