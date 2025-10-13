@@ -19,7 +19,6 @@ import {
   Camera,
   useCameraDevice,
   useCameraPermission,
-  useCameraFormat,
 } from "react-native-vision-camera";
 import React from "react";
 
@@ -94,12 +93,6 @@ export default function CameraScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const camera = useRef<Camera>(null);
   const device = useCameraDevice("back");
-
-  // Select camera format optimized for low-light photography
-  const format = useCameraFormat(device, [
-    { photoResolution: "max" }, // Maximum resolution
-    { photoHdr: false }, // Disable HDR for manual exposure control
-  ]);
 
   const [lightFrameUri, setLightFrameUri] = useState<string | null>(null);
   const [lightFrameBase64, setLightFrameBase64] = useState<string | null>(null);
