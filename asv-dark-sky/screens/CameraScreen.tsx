@@ -120,6 +120,27 @@ export default function CameraScreen() {
   );
   const [locationError, setLocationError] = useState<string | null>(null);
 
+  // Debug camera device detection
+  useEffect(() => {
+    console.log("=== CAMERA DEBUG ===");
+    console.log("Camera device:", device ? "Found" : "Not found");
+    console.log("Has permission:", hasPermission);
+    if (device) {
+      console.log("Device details:", {
+        id: device.id,
+        name: device.name,
+        hasFlash: device.hasFlash,
+        hasTorch: device.hasTorch,
+        position: device.position,
+      });
+    } else {
+      console.log(
+        "No camera device available - vision-camera may not be properly configured"
+      );
+    }
+    console.log("===================");
+  }, [device, hasPermission]);
+
   useEffect(() => {
     (async () => {
       try {
