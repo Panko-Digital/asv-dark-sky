@@ -120,6 +120,17 @@ export default function CameraScreen() {
   );
   const [locationError, setLocationError] = useState<string | null>(null);
 
+  const [isCameraActive, setIsCameraActive] = useState(false);
+
+  // Activate camera only when permission is granted and viewMode is 'camera'
+  useEffect(() => {
+    if (hasPermission && viewMode === "camera") {
+      setIsCameraActive(true);
+    } else {
+      setIsCameraActive(false);
+    }
+  }, [hasPermission, viewMode]);
+
   // Debug camera device detection
   useEffect(() => {
     console.log("=== CAMERA DEBUG ===");
