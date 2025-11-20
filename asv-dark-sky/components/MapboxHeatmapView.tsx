@@ -45,18 +45,18 @@ export default function MapboxHeatmapView({
   points,
   centerLat,
   centerLng,
-  radiusKm = 50,
-  smoothness = 80,
-  threshold = 0.15,
-  opacity = 0.7,
+  radiusKm = 50, // Zoomed in closer to 50km
+  smoothness = 50, // Reduced for smaller influence radius per point
+  threshold = 0.02, // Slightly higher to contain the gradient
+  opacity = 0.6, // 60% opacity for better map visibility
 }: MapboxHeatmapViewProps) {
-  const { width: screenWidth } = Dimensions.get("window");
+  const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const width = screenWidth;
-  const height = screenWidth; // Square map for simplicity
+  const height = screenHeight; // Full screen height
 
   const [mapUrl, setMapUrl] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [heatmapData, setHeatmapData] = useState<HeatmapImageData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [heatmapImage, setHeatmapImage] = useState<SkImage | null>(null);
 
   // Calculate appropriate zoom level based on radius
   const zoom = useMemo(() => {
@@ -114,25 +114,30 @@ export default function MapboxHeatmapView({
     return sum;
   };
 
-  // Color interpolation from green (low) to yellow to red (high)
+  // Color interpolation: green (good/low intensity) to amber to red (bad/high intensity)
+  // Low intensity (0) = Green (SQM 22+) = Good dark sky
+  // High intensity (1) = Red (SQM <20) = High light pollution
   const interpolateColor = (
     value: number
   ): { r: number; g: number; b: number; a: number } => {
     value = Math.max(0, Math.min(1, value));
     let r: number, g: number, b: number;
 
-    if (value < 0.33) {
-      const t = value / 0.33;
+    if (value < 0.29) {
+      // Green zone: SQM 22+ (good dark sky)
+      const t = value / 0.29;
       r = Math.round(t * 255);
       g = 255;
       b = 0;
-    } else if (value < 0.66) {
-      const t = (value - 0.33) / 0.33;
+    } else if (value < 0.71) {
+      // Amber/Yellow zone: SQM 20-22 (moderate)
+      const t = (value - 0.29) / 0.42;
       r = 255;
       g = Math.round(255 - t * 100);
       b = 0;
     } else {
-      const t = (value - 0.66) / 0.34;
+      // Red zone: SQM <20 (high light pollution)
+      const t = (value - 0.71) / 0.29;
       r = 255;
       g = Math.round(155 * (1 - t));
       b = 0;
@@ -141,138 +146,20 @@ export default function MapboxHeatmapView({
     return { r, g, b, a: Math.round(opacity * 255) };
   };
 
-  // Generate heatmap data
-  useEffect(() => {
-    if (points.length === 0) {
-      setLoading(false);
-      return;
-    }
-
-    const generateHeatmap = async () => {
-      setLoading(true);
-
-      // Use lower resolution grid for performance
-      const step = 3; // Reduced from 2 for better performance on mobile
-      const gridWidth = Math.ceil(width / step);
-      const gridHeight = Math.ceil(height / step);
-      const field = new Float32Array(gridWidth * gridHeight);
-
-      // Calculate field values for entire grid
-      for (let gy = 0; gy < gridHeight; gy++) {
-        for (let gx = 0; gx < gridWidth; gx++) {
-          const x = gx * step;
-          const y = gy * step;
-          const { lat, lng } = pixelToLatLng(x, y);
-          const value = calculateMetaballField(lat, lng);
-          field[gy * gridWidth + gx] = value;
-        }
-      }
-
-      // Find min/max for normalization
-      let minVal = Infinity;
-      let maxVal = -Infinity;
-      for (let i = 0; i < field.length; i++) {
-        if (field[i] > threshold) {
-          minVal = Math.min(minVal, field[i]);
-          maxVal = Math.max(maxVal, field[i]);
-        }
-      }
-
-      // Create image data with bilinear interpolation
-      const imageData: HeatmapImageData = {
-        width,
-        height,
-        data: new Uint8Array(width * height * 4),
-      };
-
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const gx = x / step;
-          const gy = y / step;
-          const gx0 = Math.floor(gx);
-          const gy0 = Math.floor(gy);
-          const gx1 = Math.min(gx0 + 1, gridWidth - 1);
-          const gy1 = Math.min(gy0 + 1, gridHeight - 1);
-
-          // Bilinear interpolation
-          const fx = gx - gx0;
-          const fy = gy - gy0;
-
-          const v00 = field[gy0 * gridWidth + gx0];
-          const v10 = field[gy0 * gridWidth + gx1];
-          const v01 = field[gy1 * gridWidth + gx0];
-          const v11 = field[gy1 * gridWidth + gx1];
-
-          const v0 = v00 * (1 - fx) + v10 * fx;
-          const v1 = v01 * (1 - fx) + v11 * fx;
-          const value = v0 * (1 - fy) + v1 * fy;
-
-          if (value > threshold && maxVal > minVal) {
-            // Normalize to 0-1 range
-            const normalized = (value - minVal) / (maxVal - minVal);
-
-            // Apply edge feathering
-            let edgeFade = 1;
-            const edgeDistance = 30;
-            const distToEdge = Math.min(x, y, width - x, height - y);
-            if (distToEdge < edgeDistance) {
-              edgeFade = distToEdge / edgeDistance;
-            }
-
-            // Soft threshold fade
-            const softThreshold = threshold * 1.5;
-            let thresholdFade = 1;
-            if (value < softThreshold) {
-              thresholdFade = (value - threshold) / (softThreshold - threshold);
-            }
-
-            const finalValue = normalized * edgeFade * thresholdFade;
-            const color = interpolateColor(finalValue);
-
-            const idx = (y * width + x) * 4;
-            imageData.data[idx] = color.r;
-            imageData.data[idx + 1] = color.g;
-            imageData.data[idx + 2] = color.b;
-            imageData.data[idx + 3] = color.a;
-          }
-        }
-      }
-
-      setHeatmapData(imageData);
-      setLoading(false);
-    };
-
-    generateHeatmap();
-  }, [
-    points,
-    centerLat,
-    centerLng,
-    radiusKm,
-    smoothness,
-    threshold,
-    opacity,
-    width,
-    height,
-  ]);
-
-  // Create Skia image from heatmap data
-  const heatmapImage = useMemo(() => {
-    if (!heatmapData) return null;
-
-    const skiaData = Skia.Data.fromBytes(heatmapData.data);
-    return Skia.Image.MakeImage(
-      {
-        width: heatmapData.width,
-        height: heatmapData.height,
-        alphaType: 1, // kPremul_SkAlphaType
-        colorType: 5, // kRGBA_8888_SkColorType
-      },
-      skiaData,
-      heatmapData.width * 4
-    );
-  }, [heatmapData]);
-
-  const mapImage = useImage(mapUrl);
+  // Convert lat/lng to pixel coordinates for drawing
+  const latLngToPixel = (lat: number, lng: number) => {
+    const kmPerDegreeLat = 111.32;
+    const kmPerDegreeLng = 111.32 * Math.cos((centerLat * Math.PI) / 180);
+    const scale = Math.min(width, height) / (radiusKm * 2);
+    
+    const deltaLat = lat - centerLat;
+    const deltaLng = lng - centerLng;
+    
+    const x = width / 2 + (deltaLng * kmPerDegreeLng * scale);
+    const y = height / 2 - (deltaLat * kmPerDegreeLat * scale);
+    
+    return { x, y };
+  };
 
   if (loading) {
     return (
@@ -283,20 +170,135 @@ export default function MapboxHeatmapView({
     );
   }
 
+  // Generate heatmap using metaball algorithm
+  useEffect(() => {
+    if (points.length === 0) {
+      setHeatmapImage(null);
+      return;
+    }
+
+    const canvas = Skia.Surface.Make(width, height);
+    if (!canvas) return;
+
+    const ctx = canvas.getCanvas();
+    
+    // Create pixel buffer - RGBA with alpha channel
+    const imageData = new Uint8Array(width * height * 4);
+    
+    // Initialize ALL pixels to fully transparent (alpha = 0)
+    for (let i = 0; i < imageData.length; i += 4) {
+      imageData[i] = 0;     // R
+      imageData[i + 1] = 0; // G
+      imageData[i + 2] = 0; // B
+      imageData[i + 3] = 0; // A - fully transparent
+    }
+
+    // Calculate metaball field values for each pixel with bilinear interpolation
+    for (let py = 0; py < height; py++) {
+      for (let px = 0; px < width; px++) {
+        let totalField = 0;
+        let weightedR = 0;
+        let weightedG = 0;
+        let weightedB = 0;
+        let totalWeight = 0;
+
+        // Sum contributions from all points with smooth Gaussian falloff
+        for (const point of points) {
+          const { x, y } = latLngToPixel(point.latitude, point.longitude);
+          const dx = px - x;
+          const dy = py - y;
+          const distSq = dx * dx + dy * dy;
+          
+          // Very wide Gaussian falloff for extremely smooth blending
+          const radius = smoothness * 3.0; // Even larger influence radius
+          const radiusSq = radius * radius;
+          
+          // Wider Gaussian spread (lower exponent = smoother)
+          const influence = Math.exp(-2.0 * distSq / radiusSq);
+          
+          // Accumulate field strength
+          totalField += influence;
+          
+          // Get color for this point's intensity
+          const color = interpolateColor(point.intensity);
+          
+          // Accumulate weighted color values for smooth blending
+          weightedR += color.r * influence;
+          weightedG += color.g * influence;
+          weightedB += color.b * influence;
+          totalWeight += influence;
+        }
+
+        // Very soft threshold with extremely smooth transition
+        let alpha = 0;
+        if (totalField > threshold) {
+          // Multiple smoothstep for ultra-smooth edges
+          const normalized = Math.min(1, (totalField - threshold) / (threshold * 5.0));
+          const smooth1 = normalized * normalized * (3 - 2 * normalized);
+          alpha = smooth1 * smooth1 * (3 - 2 * smooth1); // Double smoothstep
+        }
+
+        // Edge feathering with very soft falloff
+        const edgeDistance = 120;
+        const distFromEdge = Math.min(px, py, width - px, height - py);
+        if (distFromEdge < edgeDistance) {
+          const edgeFade = Math.pow(distFromEdge / edgeDistance, 2.0);
+          alpha *= edgeFade;
+        }
+
+        if (alpha > 0.005 && totalWeight > 0) {
+          // Bilinear interpolation of colors
+          const r = Math.round(weightedR / totalWeight);
+          const g = Math.round(weightedG / totalWeight);
+          const b = Math.round(weightedB / totalWeight);
+          const finalAlpha = alpha * opacity;
+          
+          const idx = (py * width + px) * 4;
+          // Premultiply RGB by alpha for proper blending
+          imageData[idx] = Math.round(r * finalAlpha);
+          imageData[idx + 1] = Math.round(g * finalAlpha);
+          imageData[idx + 2] = Math.round(b * finalAlpha);
+          imageData[idx + 3] = Math.round(finalAlpha * 255);
+        }
+        // If alpha <= 0.005, pixel remains fully transparent (already initialized to 0)
+      }
+    }
+
+    // Create Skia image from buffer
+    const data = Skia.Data.fromBytes(imageData);
+    const skImage = Skia.Image.MakeImage(
+      {
+        width,
+        height,
+        alphaType: 1, // 1 = Premultiplied
+        colorType: 4, // 4 = RGBA_8888 (the correct enum value)
+      },
+      data,
+      width * 4
+    );
+
+    if (skImage) {
+      setHeatmapImage(skImage);
+    }
+
+    canvas.dispose();
+  }, [points, width, height, centerLat, centerLng, radiusKm, smoothness, threshold, opacity]);
+
   return (
     <View style={styles.container}>
       {/* Background map */}
-      {mapImage && (
-        <RNImage
-          source={{ uri: mapUrl }}
-          style={styles.mapImage}
-          resizeMode="cover"
-        />
-      )}
+      <RNImage
+        source={{ uri: mapUrl }}
+        style={styles.mapImage}
+        resizeMode="cover"
+      />
 
       {/* Heatmap overlay */}
       {heatmapImage && (
-        <Canvas style={styles.canvas}>
+        <Canvas 
+          style={styles.canvas}
+          pointerEvents="none"
+        >
           <Image
             image={heatmapImage}
             x={0}
@@ -320,12 +322,13 @@ export default function MapboxHeatmapView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: "transparent",
     position: "relative",
   },
   loadingContainer: {
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "transparent",
   },
   loadingText: {
     color: "#ff0000",
@@ -341,6 +344,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: "100%",
     height: "100%",
+    backgroundColor: "transparent",
   },
   noDataOverlay: {
     position: "absolute",

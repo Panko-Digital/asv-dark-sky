@@ -34,143 +34,91 @@ const BACKEND_URL =
 
 // Default map settings
 const DEFAULT_CENTER = { latitude: -37.6, longitude: 144.8 };
-const DEFAULT_RADIUS_KM = 50;
+const DEFAULT_RADIUS_KM = 150; // Increased to 150km for wider view
 
-// Mock data for testing heatmap - Melbourne region and dark sky sites
-// Timestamps simulate measurements over several months
-const mockHeatmapData: HeatmapPoint[] = [
-  // Melbourne CBD - High light pollution (recent measurements)
-  {
-    latitude: -37.8136,
-    longitude: 144.9631,
-    intensity: 1.0,
-    sqm: 15.5,
-    label: "Melbourne CBD",
-    timestamp: "2025-10-12T20:30:00.000Z", // Tonight
-  },
-  {
-    latitude: -37.82,
-    longitude: 144.97,
-    intensity: 0.95,
-    sqm: 16.0,
-    label: "South Melbourne",
-    timestamp: "2025-10-11T21:15:00.000Z", // Last night
-  },
-  {
-    latitude: -37.8,
-    longitude: 144.95,
-    intensity: 0.9,
-    sqm: 16.5,
-    label: "North Melbourne",
-    timestamp: "2025-10-10T22:00:00.000Z", // 2 days ago
-  },
+// Generate randomized test data with two distinct separated areas
+const generateRandomTestData = (): HeatmapPoint[] => {
+  const points: HeatmapPoint[] = [];
+  
+  // Helper to convert SQM to intensity
+  const sqmToIntensity = (sqm: number): number => {
+    const clampedSqm = Math.max(15, Math.min(24, sqm));
+    return (24 - clampedSqm) / 9; // Normalize to 0-1
+  };
+  
+  // AREA 1: Left side - Urban/Suburban (worse sky quality)
+  const leftAreaClusters = [
+    // Top-left: Poor urban sky (SQM 16-18) - dense
+    { lat: -37.3, lng: 144.4, count: 14, sqmMin: 16, sqmMax: 18, spread: 0.12 },
+    
+    // Bottom-left: Moderate suburban (SQM 18-20) - medium
+    { lat: -37.8, lng: 144.5, count: 10, sqmMin: 18, sqmMax: 20, spread: 0.15 },
+  ];
+  
+  // AREA 2: Right side - Rural/Remote (better sky quality)
+  const rightAreaClusters = [
+    // Top-right: Good rural sky (SQM 20-22) - sparse
+    { lat: -37.35, lng: 145.15, count: 8, sqmMin: 20, sqmMax: 22, spread: 0.13 },
+    
+    // Bottom-right: Excellent dark sky (SQM 22-24) - very sparse
+    { lat: -37.85, lng: 145.2, count: 6, sqmMin: 22, sqmMax: 24, spread: 0.1 },
+  ];
+  
+  let id = 0;
+  
+  // Generate left area points
+  leftAreaClusters.forEach(cluster => {
+    for (let i = 0; i < cluster.count; i++) {
+      // Random offset with Gaussian distribution for organic clustering
+      const angle = Math.random() * 2 * Math.PI;
+      const distance = Math.sqrt(-2 * Math.log(Math.random() + 0.01)) * cluster.spread * 0.4;
+      
+      const lat = cluster.lat + distance * Math.cos(angle);
+      const lng = cluster.lng + distance * Math.sin(angle);
+      
+      // Random SQM within cluster range
+      const sqm = cluster.sqmMin + Math.random() * (cluster.sqmMax - cluster.sqmMin);
+      
+      points.push({
+        latitude: lat,
+        longitude: lng,
+        intensity: sqmToIntensity(sqm),
+        sqm: parseFloat(sqm.toFixed(1)),
+        label: `Urban ${id++} (${sqm.toFixed(1)})`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+  
+  // Generate right area points
+  rightAreaClusters.forEach(cluster => {
+    for (let i = 0; i < cluster.count; i++) {
+      // Random offset with Gaussian distribution
+      const angle = Math.random() * 2 * Math.PI;
+      const distance = Math.sqrt(-2 * Math.log(Math.random() + 0.01)) * cluster.spread * 0.4;
+      
+      const lat = cluster.lat + distance * Math.cos(angle);
+      const lng = cluster.lng + distance * Math.sin(angle);
+      
+      // Random SQM within cluster range
+      const sqm = cluster.sqmMin + Math.random() * (cluster.sqmMax - cluster.sqmMin);
+      
+      points.push({
+        latitude: lat,
+        longitude: lng,
+        intensity: sqmToIntensity(sqm),
+        sqm: parseFloat(sqm.toFixed(1)),
+        label: `Rural ${id++} (${sqm.toFixed(1)})`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+  
+  console.log(`Generated ${points.length} random test points in 2 distinct areas (left: urban, right: rural)`);
+  return points;
+};
 
-  // Inner suburbs - Medium-high pollution (1 week old)
-  {
-    latitude: -37.7749,
-    longitude: 144.9441,
-    intensity: 0.8,
-    sqm: 17.2,
-    label: "Brunswick",
-    timestamp: "2025-10-05T21:30:00.000Z", // 1 week ago
-  },
-  {
-    latitude: -37.8477,
-    longitude: 144.9633,
-    intensity: 0.75,
-    sqm: 17.5,
-    label: "South Yarra",
-    timestamp: "2025-10-04T20:45:00.000Z",
-  },
-  {
-    latitude: -37.7879,
-    longitude: 145.0123,
-    intensity: 0.7,
-    sqm: 17.8,
-    label: "Richmond",
-    timestamp: "2025-10-03T22:30:00.000Z",
-  },
-
-  // Outer suburbs - Medium pollution (2-3 weeks old)
-  {
-    latitude: -37.7228,
-    longitude: 144.8501,
-    intensity: 0.6,
-    sqm: 18.5,
-    label: "Geelong",
-    timestamp: "2025-09-28T21:00:00.000Z", // 2 weeks ago
-  },
-  {
-    latitude: -37.8814,
-    longitude: 145.1383,
-    intensity: 0.55,
-    sqm: 18.8,
-    label: "Dandenong",
-    timestamp: "2025-09-25T20:15:00.000Z",
-  },
-  {
-    latitude: -37.6872,
-    longitude: 145.0421,
-    intensity: 0.5,
-    sqm: 19.2,
-    label: "Whittlesea",
-    timestamp: "2025-09-20T21:45:00.000Z", // 3 weeks ago
-  },
-
-  // Regional areas - Lower pollution (1 month old)
-  {
-    latitude: -37.5622,
-    longitude: 144.9044,
-    intensity: 0.3,
-    sqm: 20.1,
-    label: "Kilmore",
-    timestamp: "2025-09-12T22:00:00.000Z", // 1 month ago
-  },
-  {
-    latitude: -37.4713,
-    longitude: 144.7852,
-    intensity: 0.25,
-    sqm: 20.5,
-    label: "Romsey",
-    timestamp: "2025-09-08T21:30:00.000Z",
-  },
-
-  // Leon Mow Dark Sky Site - Very low pollution (multiple measurements to test clustering)
-  {
-    latitude: -37.3903,
-    longitude: 144.7664,
-    intensity: 0.1,
-    sqm: 21.2,
-    label: "Leon Mow Dark Sky Site",
-    timestamp: "2025-10-12T23:00:00.000Z", // Most recent - should be displayed
-  },
-  {
-    latitude: -37.3905, // Slightly different location (nearby)
-    longitude: 144.7662,
-    intensity: 0.12,
-    sqm: 21.0,
-    label: "Leon Mow (older)",
-    timestamp: "2025-09-15T22:00:00.000Z", // Older measurement - should be clustered
-  },
-
-  // Remote dark sky areas - Minimal pollution
-  {
-    latitude: -37.25,
-    longitude: 144.5,
-    intensity: 0.05,
-    sqm: 21.8,
-    label: "Remote Dark Sky",
-    timestamp: "2025-08-20T23:30:00.000Z", // 2 months ago
-  },
-  {
-    latitude: -37.1,
-    longitude: 144.3,
-    intensity: 0.02,
-    sqm: 22.1,
-    label: "Pristine Dark Sky",
-    timestamp: "2025-08-15T22:45:00.000Z", // 2 months ago
-  },
-];
+const mockHeatmapData: HeatmapPoint[] = generateRandomTestData();
 
 export default function MapScreen() {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
@@ -219,12 +167,13 @@ export default function MapScreen() {
     }, [])
   );
 
-  // Convert SQM to intensity (0-1 scale where 1 = high light pollution)
+  // Convert SQM to intensity (0-1 scale where 1 = worst/red, 0 = best/green)
   const sqmToIntensity = (sqm: number): number => {
-    // SQM scale typically ranges from ~15 (city) to ~22 (pristine)
-    // Convert to 0-1 intensity where 1 = highest pollution (lowest SQM)
+    // SQM scale: <20 = red (bad), 20-22 = amber (ok), 22+ = green (good)
+    // Reversed: high SQM (good sky) = low intensity (green)
+    //          low SQM (bad sky) = high intensity (red)
     const clampedSqm = Math.max(15, Math.min(22, sqm));
-    return (22 - clampedSqm) / 7; // Normalize to 0-1
+    return (22 - clampedSqm) / 7; // Normalize to 0-1 (still correct)
   };
 
   // Get color for light pollution intensity (used by legend)
@@ -367,11 +316,7 @@ export default function MapScreen() {
     ? mockHeatmapData
     : convertMeasurementsToHeatmap();
 
-  // Apply clustering to reduce rendering load (useMemo must be called unconditionally)
-  const clusteredData = React.useMemo(
-    () => clusterHeatmapPoints(heatmapData),
-    [heatmapData]
-  );
+  // No clustering - show all individual measurements
 
   if (loading) {
     return (
@@ -385,12 +330,12 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       <MapboxHeatmapView
-        points={clusteredData}
+        points={heatmapData}
         centerLat={mapCenter.latitude}
         centerLng={mapCenter.longitude}
-        radiusKm={radiusKm}
-        smoothness={80}
-        threshold={0.15}
+        radiusKm={150}
+        smoothness={25}
+        threshold={0.5}
         opacity={0.7}
       />
 
@@ -437,7 +382,7 @@ export default function MapScreen() {
           </View>
           {showMockData && (
             <Text style={styles.legendNote}>
-              Showing mock data for Melbourne region
+              Showing randomized test data with full SQM range (16-24)
             </Text>
           )}
         </View>
@@ -460,11 +405,11 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: "transparent",
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
