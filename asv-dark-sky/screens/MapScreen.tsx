@@ -5,12 +5,13 @@ import {
   ActivityIndicator,
   Text,
   Alert,
-  Platform,
   TouchableOpacity,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE, Circle } from "react-native-maps";
 import { useFocusEffect } from "@react-navigation/native";
 import React from "react";
+import MapboxHeatmapView, {
+  HeatmapPoint as MapboxHeatmapPoint,
+} from "../components/MapboxHeatmapView";
 
 interface Measurement {
   id: string;
@@ -23,17 +24,17 @@ interface Measurement {
   created_at: string;
 }
 
-interface HeatmapPoint {
-  latitude: number;
-  longitude: number;
-  intensity: number; // 0-1, where 1 is highest light pollution
-  sqm: number;
+interface HeatmapPoint extends MapboxHeatmapPoint {
   label: string;
   timestamp?: string; // Optional timestamp for prioritizing recent readings
 }
 
 const BACKEND_URL =
   "https://australia-southeast2-popkorn-472305.cloudfunctions.net/get_measurements";
+
+// Default map settings
+const DEFAULT_CENTER = { latitude: -37.6, longitude: 144.8 };
+const DEFAULT_RADIUS_KM = 50;
 
 // Mock data for testing heatmap - Melbourne region and dark sky sites
 // Timestamps simulate measurements over several months
@@ -171,121 +172,13 @@ const mockHeatmapData: HeatmapPoint[] = [
   },
 ];
 
-// Dark mode map styling
-const darkMapStyle = [
-  {
-    elementType: "geometry",
-    stylers: [{ color: "#212121" }],
-  },
-  {
-    elementType: "labels.icon",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#757575" }],
-  },
-  {
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#212121" }],
-  },
-  {
-    featureType: "administrative",
-    elementType: "geometry",
-    stylers: [{ color: "#757575" }],
-  },
-  {
-    featureType: "administrative.country",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#9e9e9e" }],
-  },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#bdbdbd" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#757575" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#181818" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#616161" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#1b1b1b" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.fill",
-    stylers: [{ color: "#2c2c2c" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#8a8a8a" }],
-  },
-  {
-    featureType: "road.arterial",
-    elementType: "geometry",
-    stylers: [{ color: "#373737" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#3c3c3c" }],
-  },
-  {
-    featureType: "road.highway.controlled_access",
-    elementType: "geometry",
-    stylers: [{ color: "#4e4e4e" }],
-  },
-  {
-    featureType: "road.local",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#616161" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#757575" }],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#000000" }],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#3d3d3d" }],
-  },
-];
-
 export default function MapScreen() {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showMockData, setShowMockData] = useState(false); // Toggle for testing
   const [showLegend, setShowLegend] = useState(true); // Toggle legend visibility
-  const [region, setRegion] = useState({
-    latitude: -37.6, // Center between Melbourne and dark sky sites
-    longitude: 144.8,
-    latitudeDelta: 1.0,
-    longitudeDelta: 1.0,
-  });
-  const [currentZoom, setCurrentZoom] = useState({
-    latitudeDelta: 1.0,
-    longitudeDelta: 1.0,
-  });
+  const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
+  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
 
   const fetchMeasurements = async () => {
     try {
@@ -302,11 +195,9 @@ export default function MapScreen() {
 
         // Center map on first measurement if available
         if (withLocation.length > 0 && withLocation[0].location) {
-          setRegion({
+          setMapCenter({
             latitude: withLocation[0].location.latitude,
             longitude: withLocation[0].location.longitude,
-            latitudeDelta: 0.5,
-            longitudeDelta: 0.5,
           });
         }
       }
@@ -336,31 +227,23 @@ export default function MapScreen() {
     return (22 - clampedSqm) / 7; // Normalize to 0-1
   };
 
-  // Get color for light pollution intensity
-  const getHeatmapColor = (intensity: number, alpha: number = 1): string => {
+  // Get color for light pollution intensity (used by legend)
+  const getHeatmapColor = (intensity: number): string => {
     // Create gradient from green (low pollution) to red (high pollution)
     const red = Math.round(intensity * 255);
     const green = Math.round((1 - intensity) * 255);
     const blue = 0;
-    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    return `rgb(${red}, ${green}, ${blue})`;
   };
 
-  // Generate radius based on zoom level and intensity
-  const getCircleRadius = (intensity: number): number => {
-    const baseRadius = 6000; // Reduced from 10000 for smaller circles
-    const zoomFactor = Math.min(currentZoom.latitudeDelta * 2, 1); // Adjust for zoom
-    const intensityFactor = 0.5 + intensity * 0.5; // Bigger circles for higher pollution
-    return baseRadius * zoomFactor * intensityFactor;
-  };
-
-  // Calculate distance between two coordinates in meters
+  // Calculate distance between two coordinates in km
   const getDistance = (
     lat1: number,
     lon1: number,
     lat2: number,
     lon2: number
   ): number => {
-    const R = 6371000; // Earth's radius in meters
+    const R = 6371; // Earth's radius in km
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
@@ -379,7 +262,7 @@ export default function MapScreen() {
 
     const clustered: HeatmapPoint[] = [];
     const used = new Set<number>();
-    const clusterThreshold = 3000; // Cluster points within 3km (reduced for tighter clustering)
+    const clusterThreshold = 3; // Cluster points within 3km
 
     console.log(`[Clustering] Starting with ${points.length} points`);
 
@@ -400,7 +283,7 @@ export default function MapScreen() {
             p.longitude
           );
 
-          // Cluster based purely on proximity
+          // Cluster based purely on proximity (distance in km)
           return distance < clusterThreshold;
         });
 
@@ -479,13 +362,6 @@ export default function MapScreen() {
       }));
   };
 
-  const handleRegionChangeComplete = (newRegion: typeof region) => {
-    setCurrentZoom({
-      latitudeDelta: newRegion.latitudeDelta,
-      longitudeDelta: newRegion.longitudeDelta,
-    });
-  };
-
   // Prepare heatmap data (must be before any conditional returns for hooks)
   const heatmapData = showMockData
     ? mockHeatmapData
@@ -508,53 +384,15 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        provider={PROVIDER_GOOGLE}
-        customMapStyle={darkMapStyle}
-        initialRegion={region}
-        showsUserLocation={true}
-        showsMyLocationButton={true}
-        onRegionChangeComplete={handleRegionChangeComplete}
-      >
-        {/* Render heatmap circles */}
-        {clusteredData.map((point, index) => (
-          <Circle
-            key={`heatmap-${index}`}
-            center={{
-              latitude: point.latitude,
-              longitude: point.longitude,
-            }}
-            radius={getCircleRadius(point.intensity)}
-            fillColor={getHeatmapColor(point.intensity, 0.19)} // 19% opacity (30/255 ≈ 0.19)
-            strokeColor={getHeatmapColor(point.intensity, 0.38)} // 38% opacity (60/255 ≈ 0.38)
-            strokeWidth={1}
-          />
-        ))}
-
-        {/* Render measurement markers on top of heatmap */}
-        {clusteredData.map((point, index) => (
-          <Marker
-            key={`marker-${index}`}
-            coordinate={{
-              latitude: point.latitude,
-              longitude: point.longitude,
-            }}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={styles.markerContainer}>
-              <View
-                style={[
-                  styles.markerCircle,
-                  { borderColor: getHeatmapColor(point.intensity) },
-                ]}
-              >
-                <Text style={[styles.markerText]}>{point.sqm.toFixed(1)}</Text>
-              </View>
-            </View>
-          </Marker>
-        ))}
-      </MapView>
+      <MapboxHeatmapView
+        points={clusteredData}
+        centerLat={mapCenter.latitude}
+        centerLng={mapCenter.longitude}
+        radiusKm={radiusKm}
+        smoothness={80}
+        threshold={0.15}
+        opacity={0.7}
+      />
 
       {/* Show Scale Button - only visible when legend is hidden */}
       {!showLegend && (
@@ -624,9 +462,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000000",
   },
-  map: {
-    flex: 1,
-  },
   loadingContainer: {
     flex: 1,
     backgroundColor: "#000000",
@@ -637,23 +472,6 @@ const styles = StyleSheet.create({
     color: "#ff0000",
     fontSize: 16,
     marginTop: 10,
-  },
-  markerContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  markerCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 0,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  markerText: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#ffffff",
   },
   legendContainer: {
     position: "absolute",
