@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   StyleSheet,
   View,
@@ -39,46 +39,55 @@ const DEFAULT_RADIUS_KM = 150; // Increased to 150km for wider view
 // Generate randomized test data with two distinct separated areas
 const generateRandomTestData = (): HeatmapPoint[] => {
   const points: HeatmapPoint[] = [];
-  
+
   // Helper to convert SQM to intensity
   const sqmToIntensity = (sqm: number): number => {
     const clampedSqm = Math.max(15, Math.min(24, sqm));
     return (24 - clampedSqm) / 9; // Normalize to 0-1
   };
-  
+
   // AREA 1: Left side - Urban/Suburban (worse sky quality)
   const leftAreaClusters = [
     // Top-left: Poor urban sky (SQM 16-18) - dense
     { lat: -37.3, lng: 144.4, count: 14, sqmMin: 16, sqmMax: 18, spread: 0.12 },
-    
+
     // Bottom-left: Moderate suburban (SQM 18-20) - medium
     { lat: -37.8, lng: 144.5, count: 10, sqmMin: 18, sqmMax: 20, spread: 0.15 },
   ];
-  
+
   // AREA 2: Right side - Rural/Remote (better sky quality)
   const rightAreaClusters = [
     // Top-right: Good rural sky (SQM 20-22) - sparse
-    { lat: -37.35, lng: 145.15, count: 8, sqmMin: 20, sqmMax: 22, spread: 0.13 },
-    
+    {
+      lat: -37.35,
+      lng: 145.15,
+      count: 8,
+      sqmMin: 20,
+      sqmMax: 22,
+      spread: 0.13,
+    },
+
     // Bottom-right: Excellent dark sky (SQM 22-24) - very sparse
     { lat: -37.85, lng: 145.2, count: 6, sqmMin: 22, sqmMax: 24, spread: 0.1 },
   ];
-  
+
   let id = 0;
-  
+
   // Generate left area points
-  leftAreaClusters.forEach(cluster => {
+  leftAreaClusters.forEach((cluster) => {
     for (let i = 0; i < cluster.count; i++) {
       // Random offset with Gaussian distribution for organic clustering
       const angle = Math.random() * 2 * Math.PI;
-      const distance = Math.sqrt(-2 * Math.log(Math.random() + 0.01)) * cluster.spread * 0.4;
-      
+      const distance =
+        Math.sqrt(-2 * Math.log(Math.random() + 0.01)) * cluster.spread * 0.4;
+
       const lat = cluster.lat + distance * Math.cos(angle);
       const lng = cluster.lng + distance * Math.sin(angle);
-      
+
       // Random SQM within cluster range
-      const sqm = cluster.sqmMin + Math.random() * (cluster.sqmMax - cluster.sqmMin);
-      
+      const sqm =
+        cluster.sqmMin + Math.random() * (cluster.sqmMax - cluster.sqmMin);
+
       points.push({
         latitude: lat,
         longitude: lng,
@@ -89,20 +98,22 @@ const generateRandomTestData = (): HeatmapPoint[] => {
       });
     }
   });
-  
+
   // Generate right area points
-  rightAreaClusters.forEach(cluster => {
+  rightAreaClusters.forEach((cluster) => {
     for (let i = 0; i < cluster.count; i++) {
       // Random offset with Gaussian distribution
       const angle = Math.random() * 2 * Math.PI;
-      const distance = Math.sqrt(-2 * Math.log(Math.random() + 0.01)) * cluster.spread * 0.4;
-      
+      const distance =
+        Math.sqrt(-2 * Math.log(Math.random() + 0.01)) * cluster.spread * 0.4;
+
       const lat = cluster.lat + distance * Math.cos(angle);
       const lng = cluster.lng + distance * Math.sin(angle);
-      
+
       // Random SQM within cluster range
-      const sqm = cluster.sqmMin + Math.random() * (cluster.sqmMax - cluster.sqmMin);
-      
+      const sqm =
+        cluster.sqmMin + Math.random() * (cluster.sqmMax - cluster.sqmMin);
+
       points.push({
         latitude: lat,
         longitude: lng,
@@ -113,8 +124,10 @@ const generateRandomTestData = (): HeatmapPoint[] => {
       });
     }
   });
-  
-  console.log(`Generated ${points.length} random test points in 2 distinct areas (left: urban, right: rural)`);
+
+  console.log(
+    `Generated ${points.length} random test points in 2 distinct areas (left: urban, right: rural)`
+  );
   return points;
 };
 

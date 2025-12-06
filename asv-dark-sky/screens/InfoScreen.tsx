@@ -61,8 +61,8 @@ export default function InfoScreen() {
             <Text style={styles.bold}>Developed by:</Text> Panko Digital{"\n"}
             <Text style={styles.bold}>Website:</Text> https://panko.digital
             {"\n"}
-            {"\n"}Based in Geelong and proud members of the Astronomical Society
-            of Victoria (ASV).
+            {"\n"}Developed in collaboration with DarkSky Victoria and the Astronomical Society
+            of Victoria (ASV, Geelong Branch).
           </Text>
         </View>
       </View>

@@ -1,27 +1,15 @@
-import React, { useEffect, useState, useMemo } from "react";
-import {
-  View,
-  StyleSheet,
-  Dimensions,
-  Image as RNImage,
-  ActivityIndicator,
-  Text,
-} from "react-native";
-import {
-  Canvas,
-  Image,
-  Skia,
-  useImage,
-  SkImage,
-} from "@shopify/react-native-skia";
+import React, { useMemo } from "react";
+import { View, StyleSheet, Text } from "react-native";
+import MapboxGL from "@rnmapbox/maps";
 
-const MAPBOX_API_KEY =
-  "pk.eyJ1IjoicGFua29kaWdpdGFsYXBwcyIsImEiOiJjbWk3NndmbmwwM3BoMmxwd2ZoajZtanI0In0.uJaQMDQLzD-oD6jAO3CT5w";
+// Initialize Mapbox access token from environment variable
+// Note: Mapbox tokens are public tokens safe for client-side use
+const MAPBOX_API_KEY = process.env.EXPO_PUBLIC_MAPBOX_API_KEY;
 
-interface HeatmapImageData {
-  width: number;
-  height: number;
-  data: Uint8Array;
+if (MAPBOX_API_KEY) {
+  MapboxGL.setAccessToken(MAPBOX_API_KEY);
+} else {
+  console.warn("Mapbox API key not found. Please set EXPO_PUBLIC_MAPBOX_API_KEY in your .env file");
 }
 
 export interface HeatmapPoint {
@@ -36,8 +24,8 @@ interface MapboxHeatmapViewProps {
   centerLat: number;
   centerLng: number;
   radiusKm?: number;
-  smoothness?: number; // 20-200, controls gradient smoothness
-  threshold?: number; // 0.05-0.5, minimum intensity to display
+  smoothness?: number; // Not used in native Mapbox, but kept for compatibility
+  threshold?: number; // Not used in native Mapbox, but kept for compatibility
   opacity?: number; // 0-1, heatmap transparency
 }
 
@@ -45,276 +33,236 @@ export default function MapboxHeatmapView({
   points,
   centerLat,
   centerLng,
-  radiusKm = 50, // Zoomed in closer to 50km
-  smoothness = 50, // Reduced for smaller influence radius per point
-  threshold = 0.02, // Slightly higher to contain the gradient
-  opacity = 0.6, // 60% opacity for better map visibility
+  radiusKm = 150,
+  opacity = 0.7,
 }: MapboxHeatmapViewProps) {
-  const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-  const width = screenWidth;
-  const height = screenHeight; // Full screen height
-
-  const [mapUrl, setMapUrl] = useState<string>("");
-  const [loading, setLoading] = useState(false);
-  const [heatmapImage, setHeatmapImage] = useState<SkImage | null>(null);
-
-  // Calculate appropriate zoom level based on radius
-  const zoom = useMemo(() => {
-    // Mapbox zoom: each level doubles the scale
-    // Approximate formula to fit radius in view
-    const metersPerPixel = (radiusKm * 2000) / width;
-    const zoom = Math.log2(40075016.686 / (metersPerPixel * 256));
-    return Math.max(1, Math.min(20, Math.floor(zoom)));
-  }, [radiusKm, width]);
-
-  // Generate Mapbox static image URL
-  useEffect(() => {
-    const url = `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/${centerLng},${centerLat},${zoom}/${width}x${height}@2x?access_token=${MAPBOX_API_KEY}`;
-    setMapUrl(url);
-  }, [centerLat, centerLng, zoom, width, height]);
-
-  // Calculate distance between two coordinates in km
-  const getDistance = (
-    lat1: number,
-    lng1: number,
-    lat2: number,
-    lng2: number
-  ): number => {
-    const dLat = (lat2 - lat1) * 111.32;
-    const dLng =
-      (lng2 - lng1) * 111.32 * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
-    return Math.sqrt(dLat * dLat + dLng * dLng);
-  };
-
-  // Convert pixel coordinates to lat/lng
-  const pixelToLatLng = (x: number, y: number) => {
-    const kmPerDegreeLat = 111.32;
-    const kmPerDegreeLng = 111.32 * Math.cos((centerLat * Math.PI) / 180);
-    const scale = Math.min(width, height) / (radiusKm * 2);
-    const deltaLng = (x - width / 2) / scale;
-    const deltaLat = -(y - height / 2) / scale;
-    const lat = centerLat + deltaLat / kmPerDegreeLat;
-    const lng = centerLng + deltaLng / kmPerDegreeLng;
-    return { lat, lng };
-  };
-
-  // Metaball field calculation with Gaussian falloff
-  const calculateMetaballField = (lat: number, lng: number): number => {
-    let sum = 0;
-
-    for (let i = 0; i < points.length; i++) {
-      const point = points[i];
-      const distance = getDistance(lat, lng, point.latitude, point.longitude);
-
-      // Gaussian-like falloff for smooth organic shapes
-      const contribution = point.intensity * Math.exp(-distance / smoothness);
-      sum += contribution;
+  // Convert points to GeoJSON format for Mapbox
+  const geoJsonData = useMemo(() => {
+    if (points.length === 0) {
+      return {
+        type: "FeatureCollection" as const,
+        features: [],
+      };
     }
 
-    return sum;
-  };
+    return {
+      type: "FeatureCollection" as const,
+      features: points.map((point) => ({
+        type: "Feature" as const,
+        geometry: {
+          type: "Point" as const,
+          coordinates: [point.longitude, point.latitude],
+        },
+        properties: {
+          // Mapbox heatmap uses 'mag' or custom property for weight
+          // We'll use intensity (0-1) mapped to a weight value
+          // Higher intensity (more pollution) = higher weight
+          mag: point.intensity,
+          sqm: point.sqm,
+        },
+      })),
+    };
+  }, [points]);
 
-  // Color interpolation: green (good/low intensity) to amber to red (bad/high intensity)
-  // Low intensity (0) = Green (SQM 22+) = Good dark sky
-  // High intensity (1) = Red (SQM <20) = High light pollution
-  const interpolateColor = (
-    value: number
-  ): { r: number; g: number; b: number; a: number } => {
-    value = Math.max(0, Math.min(1, value));
-    let r: number, g: number, b: number;
+  // Calculate zoom level based on radius
+  const zoomLevel = useMemo(() => {
+    // Approximate zoom calculation: larger radius = lower zoom
+    if (radiusKm >= 200) return 6;
+    if (radiusKm >= 100) return 7;
+    if (radiusKm >= 50) return 8;
+    if (radiusKm >= 25) return 9;
+    return 10;
+  }, [radiusKm]);
 
-    if (value < 0.29) {
-      // Green zone: SQM 22+ (good dark sky)
-      const t = value / 0.29;
-      r = Math.round(t * 255);
-      g = 255;
-      b = 0;
-    } else if (value < 0.71) {
-      // Amber/Yellow zone: SQM 20-22 (moderate)
-      const t = (value - 0.29) / 0.42;
-      r = 255;
-      g = Math.round(255 - t * 100);
-      b = 0;
-    } else {
-      // Red zone: SQM <20 (high light pollution)
-      const t = (value - 0.71) / 0.29;
-      r = 255;
-      g = Math.round(155 * (1 - t));
-      b = 0;
-    }
-
-    return { r, g, b, a: Math.round(opacity * 255) };
-  };
-
-  // Convert lat/lng to pixel coordinates for drawing
-  const latLngToPixel = (lat: number, lng: number) => {
-    const kmPerDegreeLat = 111.32;
-    const kmPerDegreeLng = 111.32 * Math.cos((centerLat * Math.PI) / 180);
-    const scale = Math.min(width, height) / (radiusKm * 2);
-    
-    const deltaLat = lat - centerLat;
-    const deltaLng = lng - centerLng;
-    
-    const x = width / 2 + (deltaLng * kmPerDegreeLng * scale);
-    const y = height / 2 - (deltaLat * kmPerDegreeLat * scale);
-    
-    return { x, y };
-  };
-
-  if (loading) {
+  if (!MAPBOX_API_KEY) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#ff0000" />
-        <Text style={styles.loadingText}>Generating heatmap...</Text>
+      <View style={styles.container}>
+        <View style={styles.noDataOverlay}>
+          <Text style={styles.noDataText}>Mapbox API key not configured</Text>
+          <Text style={styles.noDataSubtext}>
+            Please set EXPO_PUBLIC_MAPBOX_API_KEY in your .env file
+          </Text>
+        </View>
       </View>
     );
   }
 
-  // Generate heatmap using metaball algorithm
-  useEffect(() => {
-    if (points.length === 0) {
-      setHeatmapImage(null);
-      return;
-    }
-
-    const canvas = Skia.Surface.Make(width, height);
-    if (!canvas) return;
-
-    const ctx = canvas.getCanvas();
-    
-    // Create pixel buffer - RGBA with alpha channel
-    const imageData = new Uint8Array(width * height * 4);
-    
-    // Initialize ALL pixels to fully transparent (alpha = 0)
-    for (let i = 0; i < imageData.length; i += 4) {
-      imageData[i] = 0;     // R
-      imageData[i + 1] = 0; // G
-      imageData[i + 2] = 0; // B
-      imageData[i + 3] = 0; // A - fully transparent
-    }
-
-    // Calculate metaball field values for each pixel with bilinear interpolation
-    for (let py = 0; py < height; py++) {
-      for (let px = 0; px < width; px++) {
-        let totalField = 0;
-        let weightedR = 0;
-        let weightedG = 0;
-        let weightedB = 0;
-        let totalWeight = 0;
-
-        // Sum contributions from all points with smooth Gaussian falloff
-        for (const point of points) {
-          const { x, y } = latLngToPixel(point.latitude, point.longitude);
-          const dx = px - x;
-          const dy = py - y;
-          const distSq = dx * dx + dy * dy;
-          
-          // Very wide Gaussian falloff for extremely smooth blending
-          const radius = smoothness * 3.0; // Even larger influence radius
-          const radiusSq = radius * radius;
-          
-          // Wider Gaussian spread (lower exponent = smoother)
-          const influence = Math.exp(-2.0 * distSq / radiusSq);
-          
-          // Accumulate field strength
-          totalField += influence;
-          
-          // Get color for this point's intensity
-          const color = interpolateColor(point.intensity);
-          
-          // Accumulate weighted color values for smooth blending
-          weightedR += color.r * influence;
-          weightedG += color.g * influence;
-          weightedB += color.b * influence;
-          totalWeight += influence;
-        }
-
-        // Very soft threshold with extremely smooth transition
-        let alpha = 0;
-        if (totalField > threshold) {
-          // Multiple smoothstep for ultra-smooth edges
-          const normalized = Math.min(1, (totalField - threshold) / (threshold * 5.0));
-          const smooth1 = normalized * normalized * (3 - 2 * normalized);
-          alpha = smooth1 * smooth1 * (3 - 2 * smooth1); // Double smoothstep
-        }
-
-        // Edge feathering with very soft falloff
-        const edgeDistance = 120;
-        const distFromEdge = Math.min(px, py, width - px, height - py);
-        if (distFromEdge < edgeDistance) {
-          const edgeFade = Math.pow(distFromEdge / edgeDistance, 2.0);
-          alpha *= edgeFade;
-        }
-
-        if (alpha > 0.005 && totalWeight > 0) {
-          // Bilinear interpolation of colors
-          const r = Math.round(weightedR / totalWeight);
-          const g = Math.round(weightedG / totalWeight);
-          const b = Math.round(weightedB / totalWeight);
-          const finalAlpha = alpha * opacity;
-          
-          const idx = (py * width + px) * 4;
-          // Premultiply RGB by alpha for proper blending
-          imageData[idx] = Math.round(r * finalAlpha);
-          imageData[idx + 1] = Math.round(g * finalAlpha);
-          imageData[idx + 2] = Math.round(b * finalAlpha);
-          imageData[idx + 3] = Math.round(finalAlpha * 255);
-        }
-        // If alpha <= 0.005, pixel remains fully transparent (already initialized to 0)
-      }
-    }
-
-    // Create Skia image from buffer
-    const data = Skia.Data.fromBytes(imageData);
-    const skImage = Skia.Image.MakeImage(
-      {
-        width,
-        height,
-        alphaType: 1, // 1 = Premultiplied
-        colorType: 4, // 4 = RGBA_8888 (the correct enum value)
-      },
-      data,
-      width * 4
-    );
-
-    if (skImage) {
-      setHeatmapImage(skImage);
-    }
-
-    canvas.dispose();
-  }, [points, width, height, centerLat, centerLng, radiusKm, smoothness, threshold, opacity]);
-
-  return (
-    <View style={styles.container}>
-      {/* Background map */}
-      <RNImage
-        source={{ uri: mapUrl }}
-        style={styles.mapImage}
-        resizeMode="cover"
-      />
-
-      {/* Heatmap overlay */}
-      {heatmapImage && (
-        <Canvas 
-          style={styles.canvas}
-          pointerEvents="none"
-        >
-          <Image
-            image={heatmapImage}
-            x={0}
-            y={0}
-            width={width}
-            height={height}
-            fit="fill"
-          />
-        </Canvas>
-      )}
-
-      {points.length === 0 && (
+  if (points.length === 0) {
+    return (
+      <View style={styles.container}>
         <View style={styles.noDataOverlay}>
           <Text style={styles.noDataText}>No measurement data</Text>
         </View>
-      )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <MapboxGL.MapView
+        style={styles.map}
+        styleURL={MapboxGL.StyleURL.Dark} // Dark theme similar to dark-v11
+      >
+        <MapboxGL.Camera
+          zoomLevel={zoomLevel}
+          centerCoordinate={[centerLng, centerLat]}
+          animationMode="none"
+        />
+
+        <MapboxGL.ShapeSource id="heatmapSource" shape={geoJsonData}>
+          {/* Heatmap layer - shows at lower zoom levels */}
+          <MapboxGL.HeatmapLayer
+            id="heatmapLayer"
+            style={{
+              // Heatmap weight based on SQM values directly
+              // Higher SQM (better sky) = higher weight = contributes more to density
+              // This ensures clusters of good SQM values create higher weighted density
+              heatmapWeight: [
+                "interpolate",
+                ["linear"],
+                ["get", "sqm"],
+                15,
+                0.1, // SQM 15 (worst) = low weight
+                18,
+                0.3, // SQM 18 (poor) = medium-low weight
+                20,
+                0.5, // SQM 20 (moderate) = medium weight
+                22,
+                0.8, // SQM 22 (good) = high weight
+                24,
+                1.0, // SQM 24 (excellent) = highest weight
+              ],
+              // Heatmap intensity increases with zoom
+              heatmapIntensity: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                0,
+                1,
+                9,
+                3,
+              ],
+              // Color gradient based on SQM-weighted density
+              // Density is now weighted by SQM values, so clusters of similar SQM blend correctly
+              // Color stops map weighted density to SQM ranges: 0.0 (SQM 15/worst) → 1.0 (SQM 24/excellent)
+              heatmapColor: [
+                "interpolate",
+                ["linear"],
+                ["heatmap-density"],
+                0,
+                "rgba(255, 0, 0, 0)", // Transparent red at edges (SQM 15 - worst)
+                0.1,
+                "rgb(255, 0, 0)", // Red - worst light pollution (SQM 15-16)
+                0.25,
+                "rgb(255, 100, 0)", // Red-orange - very poor (SQM 16-18)
+                0.5,
+                "rgb(255, 165, 0)", // Orange - poor (SQM 18-20)
+                0.75,
+                "rgb(255, 255, 0)", // Yellow/Amber - moderate (SQM 20-22)
+                1,
+                "rgb(0, 255, 0)", // Green - good dark sky (SQM 22-24)
+              ],
+              // Heatmap radius adjusts with zoom
+              heatmapRadius: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                0,
+                2,
+                9,
+                20,
+              ],
+              // Heatmap opacity
+              heatmapOpacity: opacity,
+            }}
+          />
+
+          {/* Circle layer - shows individual points at higher zoom levels */}
+          <MapboxGL.CircleLayer
+            id="circleLayer"
+            style={{
+              // Circle radius based on zoom and SQM value
+              circleRadius: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                7,
+                ["interpolate", ["linear"], ["get", "sqm"], 15, 1, 24, 4],
+                16,
+                ["interpolate", ["linear"], ["get", "sqm"], 15, 5, 24, 50],
+              ],
+              // Circle color based on SQM value directly
+              // Maps SQM ranges to colors matching the heatmap
+              circleColor: [
+                "interpolate",
+                ["linear"],
+                ["get", "sqm"],
+                15,
+                "rgba(255, 0, 0, 0.8)", // Red - worst (SQM 15)
+                18,
+                "rgb(255, 100, 0)", // Red-orange - very poor (SQM 18)
+                20,
+                "rgb(255, 165, 0)", // Orange - poor (SQM 20)
+                22,
+                "rgb(255, 255, 0)", // Yellow/Amber - moderate (SQM 22)
+                24,
+                "rgba(0, 255, 0, 0.8)", // Green - good (SQM 24)
+              ],
+              circleStrokeColor: "white",
+              circleStrokeWidth: 1,
+              // Transition from heatmap to circles at zoom 7-8
+              circleOpacity: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                7,
+                0,
+                8,
+                1,
+              ],
+            }}
+          />
+
+          {/* Symbol layer - shows SQM text labels at higher zoom levels */}
+          <MapboxGL.SymbolLayer
+            id="sqmLabelLayer"
+            style={{
+              // Display SQM value as text
+              textField: [
+                "to-string",
+                ["round", ["get", "sqm"]],
+              ],
+              // Text size interpolates from zoom 10 (0 size) to zoom 12 (12px)
+              textSize: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                10,
+                0,
+                12,
+                12,
+              ],
+              // Text color - white for visibility on colored circles
+              textColor: "white",
+              // Text halo for better contrast
+              textHaloColor: "rgba(0, 0, 0, 0.8)",
+              textHaloWidth: 1,
+              // Allow text to overlap so all labels are visible
+              textAllowOverlap: true,
+              // Match visibility with circle layer (visible at zoom 8+)
+              textOpacity: [
+                "interpolate",
+                ["linear"],
+                ["zoom"],
+                8,
+                0,
+                10,
+                1,
+              ],
+            }}
+          />
+        </MapboxGL.ShapeSource>
+      </MapboxGL.MapView>
     </View>
   );
 }
@@ -323,28 +271,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "transparent",
-    position: "relative",
   },
-  loadingContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  loadingText: {
-    color: "#ff0000",
-    marginTop: 10,
-    fontSize: 14,
-  },
-  mapImage: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-  },
-  canvas: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    backgroundColor: "transparent",
+  map: {
+    flex: 1,
   },
   noDataOverlay: {
     position: "absolute",
@@ -357,10 +286,18 @@ const styles = StyleSheet.create({
     borderColor: "#ff0000",
     borderWidth: 1,
     alignItems: "center",
+    zIndex: 1000,
   },
   noDataText: {
     color: "#ff0000",
     fontSize: 16,
     fontWeight: "bold",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  noDataSubtext: {
+    color: "#ff0000",
+    fontSize: 12,
+    textAlign: "center",
   },
 });
