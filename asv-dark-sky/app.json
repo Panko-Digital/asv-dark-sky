@@ -27,7 +27,12 @@
           "locationAlwaysPermission": "Allow $(PRODUCT_NAME) to use your location to tag sky quality measurements with geographic coordinates.",
           "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to tag sky quality measurements with geographic coordinates."
         }
-      ]
+      ],
+      [
+        "expo-font"
+      ],
+      "./plugins/withAndroidSdkVersions.js",
+      "./plugins/withMapboxConfig.js"
     ],
     "extra": {
       "eas": {
@@ -53,10 +58,10 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "package": "com.stesmi99.asvdarksky",
-      "ndkVersion": "27.0.12077973",
       "minSdkVersion": 24,
-      "compileSdkVersion": 34,
-      "targetSdkVersion": 34
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
+      "buildToolsVersion": "35.0.0"
     }
   },
   "extra": {
