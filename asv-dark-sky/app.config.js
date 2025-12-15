@@ -3,13 +3,7 @@ require('dotenv').config();
 module.exports = ({ config }) => {
     return {
         ...config,
-        android: {
-            ...config.android,
-            // Override Expo SDK 54 defaults to avoid Mapbox NDK27 requirement
-            compileSdkVersion: 33,
-            targetSdkVersion: 33,
-            buildToolsVersion: "33.0.0",
-        },
+        // Let Expo handle Android SDK versions (defaults to 36)
         extra: {
             ...config.extra,
             // Mapbox API key - public token safe for client-side use

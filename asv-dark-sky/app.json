@@ -31,8 +31,8 @@
       [
         "expo-font"
       ],
-      "./plugins/withAndroidSdkVersions.js",
-      "./plugins/withMapboxConfig.js"
+      "./plugins/withAndroidBuildGradle.js",
+      "./plugins/withAndroidAppBuildGradle.js"
     ],
     "extra": {
       "eas": {
@@ -58,10 +58,7 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ],
       "package": "com.stesmi99.asvdarksky",
-      "minSdkVersion": 24,
-      "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
-      "buildToolsVersion": "35.0.0"
+      "minSdkVersion": 24
     }
   },
   "extra": {

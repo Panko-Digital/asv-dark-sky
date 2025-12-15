@@ -88,3 +88,4 @@ The error shows it's looking for `com.mapbox.maps:android-ndk27:10.19.0`. Verify
 4. **Check build logs**: Look for Mapbox repository in search locations
 5. **If still failing**: Check @rnmapbox/maps GitHub issues for similar problems
 
+

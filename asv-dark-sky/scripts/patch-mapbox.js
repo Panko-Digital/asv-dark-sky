@@ -16,6 +16,12 @@ const buildGradlePath = path.join(
 try {
     let content = fs.readFileSync(buildGradlePath, 'utf8');
 
+    // Check if already patched
+    if (content.includes('Patched: Always use standard variant')) {
+        console.log('✅ @rnmapbox/maps already patched');
+        return;
+    }
+
     // Replace the conditional that checks targetSdk >= 35
     // Force it to always use the standard android variant
     const originalPattern = /if \(targetSdk >= 35\) \{[\s\S]*?implementation "com\.mapbox\.maps:android-ndk27:\$\{mapboxVersion\}"[\s\S]*?\} else \{[\s\S]*?implementation "com\.mapbox\.maps:android:\$\{mapboxVersion\}"[\s\S]*?\}/;
@@ -30,7 +36,7 @@ try {
         fs.writeFileSync(buildGradlePath, content, 'utf8');
         console.log('✅ Successfully patched @rnmapbox/maps to use standard variant');
     } else {
-        console.log('⚠️  Pattern not found - @rnmapbox/maps may have been updated');
+        console.log('⚠️  Pattern not found - @rnmapbox/maps may already be compatible or updated');
     }
 } catch (error) {
     console.error('❌ Error patching @rnmapbox/maps:', error.message);
